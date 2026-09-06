@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="19" time="6.503" timestamp="2026-09-06T20:27:28.661304+00:00" hostname="agent-env-f742629f-aaf8-4489-8384-ef7d52ac1c90"><testcase classname="tests.test_new_features.TestDepartments" name="test_create_department" time="0.645" /><testcase classname="tests.test_new_features.TestSmtp" name="test_get_smtp_admin" time="0.774" /><testcase classname="tests.test_new_features.TestDepartments" name="test_department_duplicate" time="0.184" /><testcase classname="tests.test_new_features.TestSmtp" name="test_get_smtp_employee_forbidden" time="0.682" /><testcase classname="tests.test_new_features.TestDepartments" name="test_department_forbidden_for_employee" time="0.591" /><testcase classname="tests.test_new_features.TestDepartments" name="test_generate_dept_banner" time="1.464" /><testcase classname="tests.test_new_features.TestSmtp" name="test_put_smtp_saves_and_masks_password" time="0.468" /><testcase classname="tests.test_new_features.TestSmtp" name="test_put_smtp_keeps_password_when_empty" time="0.297" /><testcase classname="tests.test_new_features.TestEmailSend" name="test_email_test_smtp_failure" time="0.602"><failure message="requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)">/root/.venv/lib/python3.11/site-packages/requests/models.py:1116: in json
+    return complexjson.loads(self.text, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/__init__.py:346: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:337: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/json/decoder.py:355: in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+E   json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+backend/tests/test_new_features.py:172: in test_email_test_smtp_failure
+    assert "detail" in r.json()
+                       ^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/requests/models.py:1120: in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+E   requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)</failure></testcase><testcase classname="tests.test_new_features.TestEmailSend" name="test_email_send_all_returns_json" time="1.145" /><testcase classname="tests.test_new_features.TestDepartments" name="test_generate_dept_banner_not_found" time="1.675" /><testcase classname="tests.test_new_features.TestEmailSend" name="test_email_send_one_smtp_failure" time="0.542" /><testcase classname="tests.test_new_features.TestDepartments" name="test_delete_department" time="0.284" /><testcase classname="tests.test_new_features.TestEmailSend" name="test_email_endpoints_forbidden_for_employee" time="0.142" /><testcase classname="tests.test_new_features.TestBannerResolution" name="test_employee_with_matching_department_gets_dept_banner" time="1.133" /><testcase classname="tests.test_new_features.TestClickTracking" name="test_track_click_redirects" time="0.233" /><testcase classname="tests.test_new_features.TestClickTracking" name="test_track_click_default_target" time="0.137" /><testcase classname="tests.test_new_features.TestClickTracking" name="test_analytics_shows_click" time="0.479" /><testcase classname="tests.test_new_features.TestClickTracking" name="test_analytics_forbidden_for_employee" time="0.149" /></testsuite></testsuites>

@@ -8,6 +8,8 @@ import MySignature from "@/pages/MySignature";
 import BrandAssets from "@/pages/BrandAssets";
 import GifComposer from "@/pages/GifComposer";
 import Employees from "@/pages/Employees";
+import EmailSender from "@/pages/EmailSender";
+import Analytics from "@/pages/Analytics";
 
 function Loading() {
   return (
@@ -43,6 +45,8 @@ function App() {
             <Route path="/app/brand" element={<Protected adminOnly><BrandAssets /></Protected>} />
             <Route path="/app/gif" element={<Protected adminOnly><GifComposer /></Protected>} />
             <Route path="/app/employees" element={<Protected adminOnly><Employees /></Protected>} />
+            <Route path="/app/email" element={<Protected adminOnly><EmailSender /></Protected>} />
+            <Route path="/app/analytics" element={<Protected adminOnly><Analytics /></Protected>} />
             <Route path="*" element={<Navigate to="/app/signature" replace />} />
           </Routes>
         </BrowserRouter>

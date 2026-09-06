@@ -1,5 +1,7 @@
 // Builds Outlook-compatible, table-based inline-CSS email signature HTML.
 
+const BACKEND = process.env.REACT_APP_BACKEND_URL;
+
 function esc(v) {
   return String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -20,6 +22,14 @@ const SOCIAL_META = {
   youtube: { label: "YouTube", color: "#FF0000" },
 };
 
+export function resolveBanner(user = {}, s = {}) {
+  const dept = (user.department || "").trim().toLowerCase();
+  const list = s.department_banners || [];
+  const match = list.find((b) => (b.name || "").trim().toLowerCase() === dept && b.gif_url);
+  if (match) return { gif_url: match.gif_url, banner_link: match.banner_link, key: match.name };
+  return { gif_url: s.gif_url || "", banner_link: s.banner_link || "", key: "Défaut" };
+}
+
 export function buildSignatureHtml(user = {}, s = {}) {
   const color = s.primary_color || "#2563EB";
   const textColor = "#1f2937";
@@ -37,8 +47,9 @@ export function buildSignatureHtml(user = {}, s = {}) {
   const address = esc(s.address || "");
   const disclaimer = esc(s.disclaimer || "");
   const logo = user.avatar_url || s.logo_url || "";
-  const gifUrl = s.gif_url || "";
-  const bannerLink = normUrl(s.banner_link);
+  const banner = resolveBanner(user, s);
+  const gifUrl = banner.gif_url || "";
+  const bannerLink = normUrl(banner.banner_link);
 
   const titleLine = [title, dept].filter(Boolean).join(" · ");
 
@@ -90,11 +101,17 @@ export function buildSignatureHtml(user = {}, s = {}) {
 
   rows.push(`<tr>${logoCell}${identityCell}</tr>`);
 
-  // GIF banner (rotating images), clickable if banner link provided
+  // GIF banner (rotating images), clickable + click tracking when a real user id exists
   if (gifUrl) {
     const img = `<img src="${esc(gifUrl)}" width="600" style="display:block;width:600px;max-width:100%;border-radius:8px;border:0;" alt="Bannière" />`;
-    const banner = bannerLink ? `<a href="${esc(bannerLink)}" target="_blank" style="text-decoration:none;">${img}</a>` : img;
-    rows.push(`<tr><td colspan="2" style="padding-top:16px;">${banner}</td></tr>`);
+    let banner_html = img;
+    if (bannerLink && user.id) {
+      const track = `${BACKEND}/api/track/click?u=${encodeURIComponent(user.id)}&b=${encodeURIComponent(banner.key || "Défaut")}&url=${encodeURIComponent(bannerLink)}`;
+      banner_html = `<a href="${esc(track)}" target="_blank" style="text-decoration:none;">${img}</a>`;
+    } else if (bannerLink) {
+      banner_html = `<a href="${esc(bannerLink)}" target="_blank" style="text-decoration:none;">${img}</a>`;
+    }
+    rows.push(`<tr><td colspan="2" style="padding-top:16px;">${banner_html}</td></tr>`);
   }
 
   // Disclaimer

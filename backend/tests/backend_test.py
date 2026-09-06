@@ -100,13 +100,14 @@ class TestSettings:
         assert r.status_code == 200
 
     def test_update_settings_admin(self, admin_headers):
-        payload = {
+        # Fetch first to preserve existing state (department_banners etc.)
+        current = requests.get(f"{API}/settings", headers=admin_headers, timeout=15).json()
+        payload = {**current, **{
             "company_name": "TEST_Acme", "website": "https://acme.test", "phone_main": "+33 1 23",
             "address": "1 rue Test, Paris", "disclaimer": "Confidentiel.", "primary_color": "#123456",
             "social": {"linkedin": "https://linkedin.com/x", "twitter": "", "facebook": "", "instagram": "", "youtube": ""},
-            "gif_images": [], "gif_interval_ms": 2000, "gif_url": "", "gif_version": 0, "banner_link": "https://acme.test/promo",
-            "logo_url": "",
-        }
+            "banner_link": "https://acme.test/promo",
+        }}
         r = requests.put(f"{API}/settings", json=payload, headers=admin_headers, timeout=20)
         assert r.status_code == 200, r.text
         assert r.json()["company_name"] == "TEST_Acme"

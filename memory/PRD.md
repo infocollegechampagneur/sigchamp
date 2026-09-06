@@ -25,7 +25,15 @@ Choix utilisateur : GIF animé pour les images défilantes ; plusieurs employés
 - Éléments partagés (settings globaux) propagés à la signature de chaque employé.
 
 ## Statut
-Testé end-to-end : 100% backend (21/21 pytest) + 100% frontend (e2e). Aucun bug bloquant.
+Testé end-to-end : 100% backend (40/40 pytest) + 100% frontend (e2e). Aucun bug bloquant.
+
+## Itération 2 — Nouvelles fonctionnalités (2026-06)
+- **Envoi automatique par courriel (SMTP entreprise)** : page « Envois courriel », config SMTP (hôte/port/utilisateur/mot de passe masqué/from), test d'envoi, envoi individuel + « Envoyer à tous ». Le courriel contient la signature dans le corps + fichier .html en pièce jointe + instructions + lien vers l'espace SigFlow. (aiosmtplib)
+- **Bannières par département** : l'admin crée une liste libre de départements, chacun avec son propre GIF animé (onglets dans « Bannières & GIF »). La signature d'un employé utilise la bannière dont le nom = son champ « Département », sinon la bannière par défaut.
+- **Suivi des clics** : les liens de bannière passent par `/api/track/click` (302 + journalisation, protection open-redirect). Page « Statistiques » : total, détail par bannière et par employé.
+
+## Déploiement (2026-06)
+Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `docker-compose.yml`, `.env.example`, `render.yaml`, et guide `DEPLOYMENT.md` (Docker, Windows Server, Ubuntu, hébergement web, GitHub+Render).
 
 ## Backlog / prochaines pistes
 - P1 : envoi automatique de la signature par courriel à chaque employé.

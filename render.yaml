@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: sigflow-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile.backend
+    envVars:
+      - key: MONGO_URL
+        sync: false          # paste your MongoDB Atlas connection string
+      - key: DB_NAME
+        value: sigflow
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        value: admin@sigflow.com
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: EMERGENT_LLM_KEY
+        sync: false
+      - key: INTEGRATION_PROXY_URL
+        sync: false
+      - key: REACT_APP_BACKEND_URL
+        sync: false          # set to this service's public URL, e.g. https://sigflow-backend.onrender.com
+
+  - type: web
+    name: sigflow-frontend
+    runtime: docker
+    dockerfilePath: ./Dockerfile.frontend
+    envVars:
+      - key: REACT_APP_BACKEND_URL
+        sync: false          # set to the backend public URL above
