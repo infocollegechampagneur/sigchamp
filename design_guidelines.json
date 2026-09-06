@@ -1,0 +1,171 @@
+{
+  "app_name": "SigFlow Office - Outlook Email Signature & Rotating GIF Manager",
+  "app_type": "hybrid_fullstack (B2B SaaS Internal Tool & Admin Dashboard)",
+  "language_context": "French & English Bilingual SaaS Interface (French primary UI terms: Signature Outlook, Image Défilante GIF, Bannière Promo, Mention Légale, Extension Poste)",
+  "theme": {
+    "default_mode": "dark_dashboard_light_preview",
+    "primary_archetype": "ARCHETYPE 4: SWISS & HIGH-CONTRAST PRECISION (Corporate Enterprise B2B SaaS)",
+    "description": "High-density executive command center layout paired with ultra-accurate Outlook HTML email preview canvas. Deep slate background with electric blue precision accents and glassmorphism panel headers."
+  },
+  "typography": {
+    "heading_font": "Cabinet Grotesk, Plus Jakarta Sans, sans-serif",
+    "body_font": "Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, sans-serif",
+    "mono_font": "JetBrains Mono, Fira Code, monospace",
+    "heading_rules": {
+      "h1": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50",
+      "h2": "text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100",
+      "h3": "text-lg sm:text-xl font-semibold tracking-normal text-slate-800 dark:text-slate-200",
+      "h4": "text-base font-semibold text-slate-700 dark:text-slate-300",
+      "overline": "text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400"
+    }
+  },
+  "color_palette": {
+    "background": {
+      "dark": "#0B0F17",
+      "dark_card": "#111827",
+      "dark_border": "#1F2937",
+      "light": "#F8FAFC",
+      "light_card": "#FFFFFF",
+      "light_border": "#E2E8F0"
+    },
+    "brand_colors": {
+      "primary": "#2563EB",
+      "primary_hover": "#1D4ED8",
+      "primary_light": "rgba(37, 99, 235, 0.1)",
+      "accent_emerald": "#10B981",
+      "accent_amber": "#F59E0B",
+      "accent_purple": "#8B5CF6"
+    },
+    "text_colors": {
+      "dark_primary": "#F9FAFB",
+      "dark_secondary": "#9CA3AF",
+      "dark_muted": "#6B7280",
+      "light_primary": "#0F172A",
+      "light_secondary": "#475569",
+      "light_muted": "#94A3B8"
+    },
+    "forbidden_colors": [
+      "#7351B7",
+      "#1B93A4",
+      "#000000"
+    ]
+  },
+  "layout_and_grid": {
+    "admin_dashboard": "Sidebar nav (w-64) + Fluid top bar + High density grid (grid-cols-1 lg:grid-cols-12 gap-6) with sticky live signature preview panel (col-span-5)",
+    "employee_portal": "Centered focused layout (max-w-5xl mx-auto py-8 px-4) with 2-column split: Left form inputs (Name, Title, Phone Ext, Direct Line, Department), Right live preview & copy-paste actions",
+    "bento_grid_mode": "MODE B: High Density Grid for analytics, brand asset gallery, GIF slide order management, and employee directory status"
+  },
+  "key_components": {
+    "animated_gif_composer": {
+      "description": "Visual composer where Admin uploads multiple promo images/logos, adjusts slide speed/transition interval (e.g., 2s, 4s), and generates a hosted animated GIF link or canvas slider for Outlook signature integration.",
+      "features": [
+        "Drag and drop reordering of GIF frames",
+        "Interval slider control (1s - 8s)",
+        "Image upload dropzone with preview thumbnail",
+        "Instant GIF compilation status indicator",
+        "Hosted permanent image URL generator"
+      ]
+    },
+    "live_signature_preview": {
+      "description": "True-to-life Outlook desktop & Web preview box rendered inside simulated Outlook email message window with Subject line, Sender, Receiver, and body text.",
+      "features": [
+        "Light & Dark mode email background toggle",
+        "Interactive social link hover verification",
+        "Clickable animated GIF banner preview",
+        "HTML copy button with instant Sonner toast notification",
+        "Download raw .html file option for Outlook Signatures folder"
+      ]
+    },
+    "copy_paste_modal_outlook_guide": {
+      "description": "Modal with step-by-step visual guidance in French & English for pasting into Outlook Office 365, Outlook Desktop (Win/Mac) and Web Outlook.",
+      "features": [
+        "1-Click 'Copier la signature HTML'",
+        "1-Click 'Copier le code source HTML'",
+        "Visual step 1-2-3 guide with screenshot highlights"
+      ]
+    },
+    "employee_directory_table": {
+      "description": "Shadcn UI table showing employees, their phone extensions, role (Admin/Employee), signature sync status, and direct copy link."
+    }
+  },
+  "image_urls": {
+    "corporate_logos": [
+      {
+        "url": "https://images.unsplash.com/photo-1781324121777-4d776675bad8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHw0fHxtb2Rlcm4lMjBjb3Jwb3JhdGUlMjBsb2dvJTIwYnJhbmRpbmd8ZW58MHx8fHwxNzg4NzI0NDU3fDA&ixlib=rb-4.1.0&q=85",
+        "category": "logo_sample_1",
+        "description": "Corporate Brand Logo - Gold & Clean"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1781313079038-089cfe75f7f4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBjb3Jwb3JhdGUlMjBsb2dvJTIwYnJhbmRpbmd8ZW58MHx8fHwxNzg4NzI0NDU3fDA&ixlib=rb-4.1.0&q=85",
+        "category": "logo_sample_2",
+        "description": "Futuristic Tech Logo Asset"
+      }
+    ],
+    "employee_avatars": [
+      {
+        "url": "https://images.unsplash.com/photo-1560250097-0b93528c311a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBidXNpbmVzcyUyMHBlcnNvbiUyMGhlYWRzaG90JTIwYXZhdGFyfGVufDB8fHx8MTc4ODcyNDQ2NHww&ixlib=rb-4.1.0&q=85",
+        "category": "avatar_male_1",
+        "description": "Marc-André Tremblay - Directeur des Ventes"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1607746882042-944635dfe10e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHw0fHxwcm9mZXNzaW9uYWwlMjBidXNpbmVzcyUyMHBlcnNvbiUyMGhlYWRzaG90JTIwYXZhdGFyfGVufDB8fHx8MTc4ODcyNDQ2NHww&ixlib=rb-4.1.0&q=85",
+        "category": "avatar_female_1",
+        "description": "Sophie Roy - Responsable Marketing"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1527980965255-d3b416303d12?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHwzfHxwcm9mZXNzaW9uYWwlMjBidXNpbmVzcyUyMHBlcnNvbiUyMGhlYWRzaG90JTIwYXZhdGFyfGVufDB8fHx8MTc4ODcyNDQ2NHww&ixlib=rb-4.1.0&q=85",
+        "category": "avatar_male_2",
+        "description": "Alexandre Gagnon - Support Technique"
+      }
+    ],
+    "banner_images": [
+      {
+        "url": "https://images.unsplash.com/photo-1687197180710-b2b9484a3c5f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHwxfHxjb3Jwb3JhdGUlMjBhYnN0cmFjdCUyMGJsdWUlMjBiYW5uZXJ8ZW58MHx8fHwxNzg1Nzc0MjczfDA&ixlib=rb-4.1.0&q=85",
+        "category": "promo_banner_1",
+        "description": "Nouveau Catalogue 2026 - Découvrez nos offres"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1653668168018-0ee2c5756bca?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHwyfHxjb3Jwb3JhdGUlMjBhYnN0cmFjdCUyMGJsdWUlMjBiYW5uZXJ8ZW58MHx8fHwxNzg1Nzc0MjczfDA&ixlib=rb-4.1.0&q=85",
+        "category": "promo_banner_2",
+        "description": "Événement Annuel Office & Tech - Inscrivez-vous"
+      }
+    ]
+  },
+  "testing_and_data_ids": {
+    "rule": "Every interactive input, button, table cell, tab, and preview area MUST contain a unique data-testid attribute in kebab-case.",
+    "mandatory_ids": [
+      "nav-admin-dashboard",
+      "nav-employee-portal",
+      "nav-brand-assets",
+      "nav-gif-composer",
+      "nav-settings",
+      "role-switcher-toggle",
+      "input-employee-name",
+      "input-employee-title",
+      "input-employee-email",
+      "input-employee-phone-ext",
+      "input-company-address",
+      "input-disclaimer-text",
+      "input-promo-banner-url",
+      "button-upload-logo",
+      "button-upload-gif-slide",
+      "button-copy-html-signature",
+      "button-copy-source-code",
+      "button-download-signature-file",
+      "button-save-brand-assets",
+      "signature-live-preview-container",
+      "gif-slider-preview"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Build a dual-role B2B SaaS dashboard UI: Role switch between 'Admin (Gestionnaire Brand)' and 'Employé (Ma Signature)'.",
+    "Admin can update global brand assets: Logo, rotating GIF banner slides, promo banner click URL, social media links (LinkedIn, Twitter/X, Facebook, Instagram, YouTube), company physical address, legal disclaimer text.",
+    "Employee can input personal details: Full Name, Job Title/Poste, Email address, Direct line, Phone Extension (Poste), Department, optional photo avatar.",
+    "Provide an interactive Animated GIF generator simulator / live frame player where admins can upload multiple slides, change playback speed, and see real-time GIF preview.",
+    "Generate table-based Outlook HTML signature code that works perfectly across Outlook Desktop (Windows / Mac), Web Outlook, and mobile apps. Note: Outlook requires <table> structure with inline CSS for 100% email client compatibility.",
+    "Include a 1-click 'Copier dans le presse-papier' button using navigator.clipboard with HTML Blob formatting so users can paste formatted rich text directly into Outlook.",
+    "Provide a Toast notification (Sonner) on signature copy.",
+    "Add a Modal with step-by-step instructions in French showing how to install signature in Microsoft Outlook.",
+    "Ensure all components use data-testid for automated end-to-end testing."
+  ]
+}
