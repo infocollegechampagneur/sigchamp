@@ -1,7 +1,7 @@
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { PenLine, Palette, Images, Users, LogOut, Sparkles, Mail, BarChart3 } from "lucide-react";
+import { PenLine, Palette, Images, Users, LogOut, Sparkles, Mail, BarChart3, Cloud } from "lucide-react";
 
 const navItems = [
   { to: "/app/signature", label: "Ma signature", icon: PenLine, testid: "nav-employee-portal", roles: ["admin", "employee"] },
@@ -9,6 +9,7 @@ const navItems = [
   { to: "/app/gif", label: "Bannières & GIF", icon: Images, testid: "nav-gif-composer", roles: ["admin"] },
   { to: "/app/employees", label: "Employés", icon: Users, testid: "nav-employees", roles: ["admin"] },
   { to: "/app/email", label: "Envois courriel", icon: Mail, testid: "nav-email", roles: ["admin"] },
+  { to: "/app/deploy", label: "Déploiement M365", icon: Cloud, testid: "nav-deploy", roles: ["admin"] },
   { to: "/app/analytics", label: "Statistiques", icon: BarChart3, testid: "nav-analytics", roles: ["admin"] },
 ];
 
@@ -80,7 +81,7 @@ export default function Layout({ children }) {
       </div>
 
       {/* Mobile bottom nav */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-[#0d1119] border-t border-slate-800 flex justify-around py-2">
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-[#0d1119] border-t border-slate-800 flex justify-start overflow-x-auto py-2 no-scrollbar">
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -88,7 +89,7 @@ export default function Layout({ children }) {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] ${isActive ? "text-blue-400" : "text-slate-500"}`
+                `flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] shrink-0 min-w-[64px] ${isActive ? "text-blue-400" : "text-slate-500"}`
               }
             >
               <Icon className="h-5 w-5" />

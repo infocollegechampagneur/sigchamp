@@ -43,6 +43,9 @@ APP_NAME = "sigflow"
 
 BACKEND_PUBLIC_URL = os.environ.get("REACT_APP_BACKEND_URL", "")
 
+STORAGE_BACKEND = (os.environ.get("STORAGE_BACKEND") or "emergent").strip().lower()
+LOCAL_STORAGE_DIR = Path(os.environ.get("LOCAL_STORAGE_DIR") or (ROOT_DIR / "storage"))
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -51,7 +54,7 @@ api_router = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
 
 # ---------------------------------------------------------------------------
-# Object storage helpers
+# Object storage helpers — pluggable backend (local disk or Emergent)
 # ---------------------------------------------------------------------------
 storage_key = None
 
@@ -66,25 +69,21 @@ def init_storage(force: bool = False):
     return storage_key
 
 
-def put_object(path: str, data: bytes, content_type: str) -> dict:
+def _emergent_put(path: str, data: bytes, content_type: str) -> dict:
     key = init_storage()
-    resp = requests.put(
-        f"{STORAGE_URL}/objects/{path}",
-        headers={"X-Storage-Key": key, "Content-Type": content_type},
-        data=data, timeout=120,
-    )
+    resp = requests.put(f"{STORAGE_URL}/objects/{path}",
+                        headers={"X-Storage-Key": key, "Content-Type": content_type},
+                        data=data, timeout=120)
     if resp.status_code == 404:
         key = init_storage(force=True)
-        resp = requests.put(
-            f"{STORAGE_URL}/objects/{path}",
-            headers={"X-Storage-Key": key, "Content-Type": content_type},
-            data=data, timeout=120,
-        )
+        resp = requests.put(f"{STORAGE_URL}/objects/{path}",
+                            headers={"X-Storage-Key": key, "Content-Type": content_type},
+                            data=data, timeout=120)
     resp.raise_for_status()
     return resp.json()
 
 
-def get_object(path: str):
+def _emergent_get(path: str):
     key = init_storage()
     resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
     if resp.status_code == 404:
@@ -92,6 +91,36 @@ def get_object(path: str):
         resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
     resp.raise_for_status()
     return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+
+
+def _local_path(path: str) -> Path:
+    safe = path.replace("..", "").lstrip("/")
+    return LOCAL_STORAGE_DIR / safe
+
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    if STORAGE_BACKEND == "local":
+        fp = _local_path(path)
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        fp.write_bytes(data)
+        return {"path": path}
+    return _emergent_put(path, data, content_type)
+
+
+def get_object(path: str):
+    if STORAGE_BACKEND == "local":
+        fp = _local_path(path)
+        if fp.exists():
+            ext = fp.suffix.lstrip(".").lower()
+            return fp.read_bytes(), MIME_TYPES.get(ext, "application/octet-stream")
+        # fallback to Emergent for objects uploaded before switching to local
+        if EMERGENT_KEY:
+            try:
+                return _emergent_get(path)
+            except Exception:
+                pass
+        raise FileNotFoundError(path)
+    return _emergent_get(path)
 
 
 MIME_TYPES = {
@@ -251,6 +280,13 @@ class GifGenerateInput(BaseModel):
     banner_link: Optional[str] = None
 
 
+def _oid(v: str) -> ObjectId:
+    try:
+        return ObjectId(v)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Identifiant invalide")
+
+
 def user_to_public(u: dict) -> dict:
     return {
         "id": str(u.get("id") or u.get("_id")),
@@ -262,6 +298,10 @@ def user_to_public(u: dict) -> dict:
         "direct_line": u.get("direct_line", ""),
         "department": u.get("department", ""),
         "avatar_url": u.get("avatar_url", ""),
+        "signature_installed": bool(u.get("signature_installed", False)),
+        "installed_at": u.get("installed_at"),
+        "last_sent_at": u.get("last_sent_at"),
+        "last_send_status": u.get("last_send_status"),
     }
 
 
@@ -634,16 +674,39 @@ async def email_test(data: EmailTestInput, admin: dict = Depends(require_admin))
     return {"ok": True}
 
 
+async def _log_send(user: dict, status: str, error: str = ""):
+    now = datetime.now(timezone.utc).isoformat()
+    await db.send_log.insert_one({
+        "user_id": user.get("id"), "email": user.get("email"), "name": user.get("name"),
+        "status": status, "error": error, "ts": now,
+    })
+    await db.users.update_one({"_id": ObjectId(user["id"])},
+                              {"$set": {"last_sent_at": now, "last_send_status": status}})
+
+
+async def _send_signature_to(user: dict, settings: dict):
+    sig = build_signature_html(user, settings)
+    try:
+        await _send_email(user["email"], "Votre signature courriel officielle",
+                          _email_body(user, sig), attachment_html=_signature_file(sig))
+        await _log_send(user, "sent")
+        return True, ""
+    except HTTPException as e:
+        await _log_send(user, "failed", str(e.detail))
+        raise
+    except Exception as e:
+        await _log_send(user, "failed", str(e))
+        raise
+
+
 @api_router.post("/email/send/{emp_id}")
 async def email_send_one(emp_id: str, admin: dict = Depends(require_admin)):
-    user = await db.users.find_one({"_id": ObjectId(emp_id)})
+    user = await db.users.find_one({"_id": _oid(emp_id)})
     if not user:
         raise HTTPException(status_code=404, detail="Employé introuvable")
     user["id"] = str(user["_id"])
     settings = await load_settings()
-    sig = build_signature_html(user, settings)
-    await _send_email(user["email"], "Votre signature courriel officielle",
-                      _email_body(user, sig), attachment_html=_signature_file(sig))
+    await _send_signature_to(user, settings)
     return {"ok": True, "sent_to": user["email"]}
 
 
@@ -655,13 +718,48 @@ async def email_send_all(admin: dict = Depends(require_admin)):
     for u in users:
         u["id"] = str(u["_id"])
         try:
-            sig = build_signature_html(u, settings)
-            await _send_email(u["email"], "Votre signature courriel officielle",
-                              _email_body(u, sig), attachment_html=_signature_file(sig))
+            await _send_signature_to(u, settings)
             sent.append(u["email"])
         except Exception as e:
-            failed.append({"email": u["email"], "error": str(e)})
+            failed.append({"email": u["email"], "error": str(getattr(e, "detail", e))})
     return {"sent": sent, "failed": failed, "sent_count": len(sent)}
+
+
+@api_router.post("/email/send-reminders")
+async def email_send_reminders(admin: dict = Depends(require_admin)):
+    settings = await load_settings()
+    users = await db.users.find({"role": "employee", "signature_installed": {"$ne": True}}).to_list(1000)
+    sent, failed = [], []
+    for u in users:
+        u["id"] = str(u["_id"])
+        try:
+            await _send_signature_to(u, settings)
+            sent.append(u["email"])
+        except Exception as e:
+            failed.append({"email": u["email"], "error": str(getattr(e, "detail", e))})
+    return {"sent": sent, "failed": failed, "sent_count": len(sent), "targeted": len(users)}
+
+
+@api_router.put("/employees/{emp_id}/installed")
+async def mark_installed(emp_id: str, admin: dict = Depends(require_admin)):
+    user = await db.users.find_one({"_id": _oid(emp_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="Employé introuvable")
+    new_val = not bool(user.get("signature_installed", False))
+    update = {"signature_installed": new_val,
+              "installed_at": datetime.now(timezone.utc).isoformat() if new_val else None}
+    await db.users.update_one({"_id": _oid(emp_id)}, {"$set": update})
+    fresh = await db.users.find_one({"_id": _oid(emp_id)})
+    fresh["id"] = str(fresh["_id"])
+    return user_to_public(fresh)
+
+
+@api_router.get("/send-log")
+async def get_send_log(admin: dict = Depends(require_admin)):
+    entries = await db.send_log.find().sort("ts", -1).to_list(200)
+    for e in entries:
+        e["id"] = str(e.pop("_id"))
+    return entries
 
 
 # ---------------------------------------------------------------------------
@@ -727,8 +825,8 @@ async def create_employee(data: EmployeeCreate, admin: dict = Depends(require_ad
 async def update_employee(emp_id: str, data: ProfileUpdate, admin: dict = Depends(require_admin)):
     update = {k: v for k, v in data.model_dump().items() if v is not None}
     if update:
-        await db.users.update_one({"_id": ObjectId(emp_id)}, {"$set": update})
-    fresh = await db.users.find_one({"_id": ObjectId(emp_id)})
+        await db.users.update_one({"_id": _oid(emp_id)}, {"$set": update})
+    fresh = await db.users.find_one({"_id": _oid(emp_id)})
     if not fresh:
         raise HTTPException(status_code=404, detail="Employé introuvable")
     fresh["id"] = str(fresh["_id"])
@@ -737,13 +835,115 @@ async def update_employee(emp_id: str, data: ProfileUpdate, admin: dict = Depend
 
 @api_router.delete("/employees/{emp_id}")
 async def delete_employee(emp_id: str, admin: dict = Depends(require_admin)):
-    target = await db.users.find_one({"_id": ObjectId(emp_id)})
+    target = await db.users.find_one({"_id": _oid(emp_id)})
     if not target:
         raise HTTPException(status_code=404, detail="Employé introuvable")
     if target.get("role") == "admin":
         raise HTTPException(status_code=400, detail="Impossible de supprimer un administrateur")
-    await db.users.delete_one({"_id": ObjectId(emp_id)})
+    await db.users.delete_one({"_id": _oid(emp_id)})
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Microsoft 365 deployment scripts (PowerShell, pre-filled)
+# ---------------------------------------------------------------------------
+def _ps_signatures_block(users, settings):
+    lines = ["$signatures = @{}"]
+    for u in users:
+        u["id"] = str(u["_id"])
+        sig = build_signature_html(u, settings).replace("\r", "").replace("\n", " ")
+        email = u.get("email", "").replace("'", "''")
+        lines.append(f"$signatures['{email}'] = @'\n{sig}\n'@")
+    return "\n".join(lines)
+
+
+def _ps_response(script: str, filename: str):
+    return Response(content=script, media_type="text/plain; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@api_router.get("/deploy/exchange-script")
+async def deploy_exchange_script(admin: dict = Depends(require_admin)):
+    settings = await load_settings()
+    users = await db.users.find({"role": "employee"}).to_list(1000)
+    block = _ps_signatures_block(users, settings)
+    script = f"""# =====================================================================
+# SigFlow Office - Signatures Exchange Online (une regle par employe)
+# ---------------------------------------------------------------------
+# Ajoute automatiquement la signature en bas de chaque courriel sortant.
+# Aucun copier-coller cote employe.
+#
+# ETAPES (a executer par l'admin Microsoft 365) :
+#   1. Install-Module ExchangeOnlineManagement -Scope CurrentUser
+#   2. Connect-ExchangeOnline -UserPrincipalName admin@votredomaine.com
+#   3. Executez ce script :  .\\sigflow-exchange-signatures.ps1
+# =====================================================================
+
+{block}
+
+foreach ($email in $signatures.Keys) {{
+    $ruleName = "SigFlow - $email"
+    $html = $signatures[$email]
+    if (Get-TransportRule -Identity $ruleName -ErrorAction SilentlyContinue) {{
+        Set-TransportRule -Identity $ruleName -From $email `
+            -ApplyHtmlDisclaimerLocation Append -ApplyHtmlDisclaimerText $html `
+            -ApplyHtmlDisclaimerFallbackAction Wrap
+        Write-Host "Mise a jour : $ruleName"
+    }} else {{
+        New-TransportRule -Name $ruleName -From $email `
+            -ApplyHtmlDisclaimerLocation Append -ApplyHtmlDisclaimerText $html `
+            -ApplyHtmlDisclaimerFallbackAction Wrap
+        Write-Host "Cree : $ruleName"
+    }}
+}}
+Write-Host "Termine. $($signatures.Count) signature(s) configuree(s)."
+"""
+    return _ps_response(script, "sigflow-exchange-signatures.ps1")
+
+
+@api_router.get("/deploy/gpo-script")
+async def deploy_gpo_script(admin: dict = Depends(require_admin)):
+    settings = await load_settings()
+    users = await db.users.find({"role": "employee"}).to_list(1000)
+    block = _ps_signatures_block(users, settings)
+    script = f"""# =====================================================================
+# SigFlow Office - Deploiement signature Outlook via GPO
+# ---------------------------------------------------------------------
+# A deployer en script d'ouverture de session :
+#   Configuration utilisateur > Strategies > Parametres Windows > Scripts
+#   > Ouverture de session > ajouter ce .ps1
+# Definit la signature par defaut d'Outlook (bureau) pour chaque employe.
+# =====================================================================
+
+{block}
+
+# Detecte le courriel de l'utilisateur courant (Active Directory)
+$email = $null
+try {{
+    $email = ([ADSISearcher]"(&(objectCategory=User)(sAMAccountName=$env:USERNAME))").FindOne().Properties["mail"][0]
+}} catch {{}}
+
+if (-not $email) {{ Write-Host "Courriel introuvable pour $env:USERNAME"; exit }}
+
+if ($signatures.ContainsKey($email)) {{
+    $sigName = "Signature entreprise"
+    $sigDir = Join-Path $env:APPDATA "Microsoft\\Signatures"
+    New-Item -ItemType Directory -Force -Path $sigDir | Out-Null
+    $html = $signatures[$email]
+    [System.IO.File]::WriteAllText((Join-Path $sigDir "$sigName.htm"), $html, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText((Join-Path $sigDir "$sigName.txt"), "", [System.Text.Encoding]::UTF8)
+
+    # Signature par defaut (Outlook 2016 / 2019 / 365 = Office 16.0)
+    $base = "HKCU:\\Software\\Microsoft\\Office\\16.0\\Common\\MailSettings"
+    New-Item -Path $base -Force | Out-Null
+    Set-ItemProperty -Path $base -Name "NewSignature" -Value $sigName
+    Set-ItemProperty -Path $base -Name "ReplySignature" -Value $sigName
+    Write-Host "Signature installee pour $email"
+}} else {{
+    Write-Host "Aucune signature SigFlow trouvee pour $email"
+}}
+"""
+    return _ps_response(script, "sigflow-outlook-gpo.ps1")
 
 
 @api_router.get("/")
@@ -764,11 +964,15 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
-    try:
-        init_storage()
-        logger.info("Storage initialized")
-    except Exception as e:
-        logger.error(f"Storage init failed: {e}")
+    if STORAGE_BACKEND == "local":
+        LOCAL_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Storage: local disk at {LOCAL_STORAGE_DIR}")
+    else:
+        try:
+            init_storage()
+            logger.info("Storage: Emergent object storage")
+        except Exception as e:
+            logger.error(f"Storage init failed: {e}")
 
     await db.users.create_index("email", unique=True)
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@sigflow.com").lower()

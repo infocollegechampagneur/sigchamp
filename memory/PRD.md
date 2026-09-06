@@ -35,6 +35,12 @@ Testé end-to-end : 100% backend (40/40 pytest) + 100% frontend (e2e). Aucun bug
 ## Déploiement (2026-06)
 Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `docker-compose.yml`, `.env.example`, `render.yaml`, et guide `DEPLOYMENT.md` (Docker, Windows Server, Ubuntu, hébergement web, GitHub+Render).
 
+## Itération 3 — Autonomie & déploiement réseau (2026-06)
+- **Stockage local autonome** : `STORAGE_BACKEND=local` (défaut) stocke logos/GIF/avatars sur disque (`LOCAL_STORAGE_DIR`), servis via `/api/files` — plus de dépendance à Emergent (fallback lecture Emergent pour anciens fichiers).
+- **Déploiement M365 (page « Déploiement M365 »)** : génération de 2 scripts PowerShell pré-remplis téléchargeables — (a) règles de flux Exchange Online **par employé** (signature ajoutée côté serveur à tous les courriels sortants), (b) script GPO définissant la signature par défaut d'Outlook.
+- **Journal d'envois** : collection `send_log`, page « Envois courriel » affiche statut (Envoyée/Échec + erreur), destinataire, horodatage ; chaque envoi met à jour `last_send_status`/`last_sent_at`.
+- **Marquage « installée » manuel + relance manuelle** : bascule `signature_installed` par employé ; bouton « Relancer les non-installés » (`/api/email/send-reminders`) qui ne cible que les employés non marqués installés.
+
 ## Backlog / prochaines pistes
 - P1 : envoi automatique de la signature par courriel à chaque employé.
 - P1 : plusieurs modèles/mises en page de signature au choix.

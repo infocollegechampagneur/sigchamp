@@ -68,6 +68,9 @@ code, .font-mono { font-family: 'JetBrains Mono', monospace; }
 }
 .sf-fade-up { animation: sf-fade-up 0.5s cubic-bezier(0.16,1,0.3,1) both; }
 
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 @layer base {
   [data-debug-wrapper="true"] { display: contents !important; }
 }

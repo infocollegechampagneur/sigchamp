@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 3 features fully validated. Backend: 54/54 pytest passing (21 regression + 19 iter2 + 14 iter3). Iter3 new: local storage upload/gif -> /api/backend/storage/... served by GET /api/files/{path} with proper content-type; PUT /employees/{id}/installed toggles signature_installed + installed_at, persists via GET /employees; GET /send-log returns entries (no _id leakage) after failed send; POST /email/send-reminders returns {sent,failed,sent_count,targeted} and correctly targets only signature_installed!=true; GET /deploy/exchange-script + /deploy/gpo-script return 200 text/plain with Content-Disposition attachment and correct filenames, body contains $signatures hashtable + New-TransportRule (exchange) / MailSettings NewSignature (gpo). All admin endpoints return 403 for employees, 401/403 unauthenticated. Frontend e2e: admin login, /app/email shows send-log-section, button-send-reminders shows 'Relancer (22)', toggle-installed-{id} works (emerald class after reload = persisted), sendOne creates log entry 'Échec ... smtp.example.com ...' (graceful — expected with fake SMTP), reminders click yields graceful toast/no crash. /app/deploy downloads both .ps1 files with correct suggested_filename. /app/brand renders local /api/files/ images (0 broken). RBAC: newly-registered employee is redirected from /app/deploy to /app/signature and nav-deploy is not visible. One flaky ingress ConnectTimeout on first exchange-script fetch resolved on retry.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/backend/tests/test_iteration3.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py PUT /employees/{id}/installed ignores request body (always toggles). Function signature declares body_installed=True but reads current state and flips it. This is fine for the UI toggle but could be surprising if an admin ever wants to force a specific state via API. Consider accepting an optional {installed: bool} body.",
+    "server.py _ps_signatures_block bypasses newline handling only for \\r/\\n but the here-string uses @'...'@ which is a single-quoted here-string in PowerShell — variables/backticks won't be expanded, which is intentional and safe for HTML with $ chars. Good.",
+    "GET /send-log has no pagination and caps at 200 entries — fine for MVP; consider ?limit/?offset later.",
+    "PUT /employees/{id}/installed uses ObjectId(emp_id) without validation; passing a non-24-hex id triggers a 500 (bson.errors.InvalidId). Wrap in try/except -> 400. Same pattern in delete_employee/update_employee.",
+    "M365Deploy.jsx uses axios blob response; ensure no auth token is logged. Not a bug, just a note."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration3.py (new)",
+    "/app/test_reports/iteration_3.json"
+  ],
+  "success_rate": {"backend": "100% (54/54)", "frontend": "100%"},
+  "test_credentials": "admin@sigflow.com / admin123 works. Employees registered per run.",
+  "seed_data_creation": "Created a few TEST_I3 employees (emp_i3_*) and emprbac_* accounts; test-created dept/emp cleaned up in fixtures where applicable.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Storage backend is 'local' -> /app/backend/storage/sigflow/... served via GET /api/files/{path}. All /api/email/* still return 502 with fake SMTP (expected). Send log entries: {id,email,name,status(sent|failed),error,ts}. Reminders endpoint filters role=='employee' & signature_installed!=True. PS scripts are static text (no cache). Nav testids: nav-employee-portal, nav-brand-assets, nav-gif-composer, nav-employees, nav-email, nav-analytics, nav-deploy. Login testids: input-auth-email/password/name, button-auth-submit, toggle-auth-mode. Note: toggle-installed on admin row does not decrement 'Relancer (N)' count because the count filters role==employee only — this is correct behavior."
+}

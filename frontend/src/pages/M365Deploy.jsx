@@ -1,0 +1,94 @@
+import React, { useState } from "react";
+import { toast } from "sonner";
+import { api } from "@/lib/apiClient";
+import { Button } from "@/components/ui/button";
+import { Download, Loader2, ServerCog, MonitorCog, ShieldCheck } from "lucide-react";
+
+function useDownload() {
+  const [loading, setLoading] = useState(null);
+  const download = async (path, filename, key) => {
+    setLoading(key);
+    try {
+      const res = await api.get(path, { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`${filename} téléchargé.`);
+    } catch {
+      toast.error("Échec du téléchargement. Assurez-vous d'avoir des employés configurés.");
+    } finally {
+      setLoading(null);
+    }
+  };
+  return { loading, download };
+}
+
+export default function M365Deploy() {
+  const { loading, download } = useDownload();
+
+  return (
+    <div className="max-w-5xl mx-auto px-5 lg:px-8 py-8">
+      <div className="mb-8">
+        <p className="text-xs font-bold uppercase tracking-widest text-blue-400">Administration</p>
+        <h1 className="font-display text-3xl lg:text-4xl font-extrabold text-white mt-1">Déploiement M365</h1>
+        <p className="text-slate-400 mt-2">Poussez les signatures automatiquement, sans copier-coller. Téléchargez un script pré-rempli et exécutez-le côté admin.</p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Exchange */}
+        <div className="rounded-2xl bg-[#111827] border border-slate-800 p-6 sf-fade-up flex flex-col">
+          <div className="h-11 w-11 rounded-xl bg-blue-600/20 flex items-center justify-center mb-4"><ServerCog className="h-6 w-6 text-blue-400" /></div>
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-display text-xl font-bold text-white">Exchange Online</h3>
+            <span className="text-[10px] font-bold uppercase tracking-wide bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full">Recommandé</span>
+          </div>
+          <p className="text-sm text-slate-400 mb-4">
+            Ajoute la signature <b className="text-slate-200">automatiquement en bas de chaque courriel sortant</b> de chaque
+            employé, côté serveur. Rien à installer sur les postes.
+          </p>
+          <ol className="text-sm text-slate-400 space-y-1.5 mb-5 list-decimal list-inside">
+            <li><code className="text-blue-300">Install-Module ExchangeOnlineManagement</code></li>
+            <li><code className="text-blue-300">Connect-ExchangeOnline</code> (compte admin)</li>
+            <li>Exécutez le script téléchargé</li>
+          </ol>
+          <div className="mt-auto">
+            <Button onClick={() => download("/deploy/exchange-script", "sigflow-exchange-signatures.ps1", "ex")} disabled={loading === "ex"} data-testid="button-download-exchange" className="w-full h-11 bg-blue-600 hover:bg-blue-500 text-white font-semibold">
+              {loading === "ex" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />} Script Exchange (.ps1)
+            </Button>
+          </div>
+        </div>
+
+        {/* GPO */}
+        <div className="rounded-2xl bg-[#111827] border border-slate-800 p-6 sf-fade-up flex flex-col">
+          <div className="h-11 w-11 rounded-xl bg-blue-600/20 flex items-center justify-center mb-4"><MonitorCog className="h-6 w-6 text-blue-400" /></div>
+          <h3 className="font-display text-xl font-bold text-white mb-1">GPO / Outlook Bureau</h3>
+          <p className="text-sm text-slate-400 mb-4">
+            Définit la <b className="text-slate-200">signature par défaut d'Outlook</b> sur chaque poste, via une stratégie
+            de groupe (script d'ouverture de session). Idéal avec Active Directory.
+          </p>
+          <ol className="text-sm text-slate-400 space-y-1.5 mb-5 list-decimal list-inside">
+            <li>GPO → Configuration utilisateur → Scripts</li>
+            <li>Ouverture de session → ajoutez le .ps1</li>
+            <li>Chaque employé reçoit sa signature au login</li>
+          </ol>
+          <div className="mt-auto">
+            <Button onClick={() => download("/deploy/gpo-script", "sigflow-outlook-gpo.ps1", "gpo")} disabled={loading === "gpo"} data-testid="button-download-gpo" variant="outline" className="w-full h-11 border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-700 hover:text-white font-semibold">
+              {loading === "gpo" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />} Script GPO (.ps1)
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl bg-blue-600/10 border border-blue-500/20 p-5 flex gap-3">
+        <ShieldCheck className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
+        <div className="text-sm text-slate-300">
+          <p className="font-semibold text-white mb-1">Chaque script est pré-rempli avec les signatures actuelles.</p>
+          <p className="text-slate-400">Regénérez et re-téléchargez le script après avoir modifié la charte graphique, les bannières ou la liste des employés, afin que les signatures déployées restent à jour. Les images (logo, GIF) restent hébergées et se mettent à jour automatiquement.</p>
+        </div>
+      </div>
+    </div>
+  );
+}

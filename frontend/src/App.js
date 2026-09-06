@@ -10,6 +10,7 @@ import GifComposer from "@/pages/GifComposer";
 import Employees from "@/pages/Employees";
 import EmailSender from "@/pages/EmailSender";
 import Analytics from "@/pages/Analytics";
+import M365Deploy from "@/pages/M365Deploy";
 
 function Loading() {
   return (
@@ -46,6 +47,7 @@ function App() {
             <Route path="/app/gif" element={<Protected adminOnly><GifComposer /></Protected>} />
             <Route path="/app/employees" element={<Protected adminOnly><Employees /></Protected>} />
             <Route path="/app/email" element={<Protected adminOnly><EmailSender /></Protected>} />
+            <Route path="/app/deploy" element={<Protected adminOnly><M365Deploy /></Protected>} />
             <Route path="/app/analytics" element={<Protected adminOnly><Analytics /></Protected>} />
             <Route path="*" element={<Navigate to="/app/signature" replace />} />
           </Routes>
