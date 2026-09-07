@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Mail, Save, Loader2, Send, SendHorizonal, ServerCog, CheckCircle2, BellRing, Circle, History, XCircle } from "lucide-react";
+import { Mail, Save, Loader2, Send, SendHorizonal, ServerCog, CheckCircle2, BellRing, Circle, History, XCircle, Zap } from "lucide-react";
 
 function StatusBadge({ status }) {
   if (status === "sent") return <span className="inline-flex items-center gap-1 text-xs text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" />Envoyée</span>;
@@ -34,6 +34,11 @@ export default function EmailSender() {
   }, []);
 
   const set = (k) => (e) => setCfg((c) => ({ ...c, [k]: e.target.value }));
+
+  const prefillSmtp2go = () => {
+    setCfg((c) => ({ ...c, host: "mail.smtp2go.com", port: 587 }));
+    toast.success("Réglages SMTP2Go pré-remplis. Ajoutez votre utilisateur, mot de passe et adresse d'expéditeur.");
+  };
 
   const saveCfg = async () => {
     setSavingCfg(true);
@@ -96,7 +101,12 @@ export default function EmailSender() {
           <div className="flex items-center gap-2 mb-5">
             <ServerCog className="h-5 w-5 text-blue-400" />
             <h3 className="font-semibold text-white">Serveur SMTP</h3>
-            {cfg.has_password && <span className="ml-auto flex items-center gap-1 text-xs text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" /> Configuré</span>}
+            <button onClick={prefillSmtp2go} data-testid="button-prefill-smtp2go" className="ml-auto flex items-center gap-1.5 text-xs text-blue-300 hover:text-blue-200 border border-blue-500/40 bg-blue-500/10 rounded-lg px-2.5 py-1.5 transition-colors">
+              <Zap className="h-3.5 w-3.5" /> Pré-remplir SMTP2Go
+            </button>
+          </div>
+          <div className="flex items-center gap-2 mb-4 -mt-2">
+            {cfg.has_password && <span className="flex items-center gap-1 text-xs text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" /> Configuré</span>}
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2"><Label className="text-slate-300">Hôte SMTP</Label>

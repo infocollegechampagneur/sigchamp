@@ -7,6 +7,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 import io
 import uuid
+import secrets
 import logging
 import urllib.parse
 from datetime import datetime, timezone, timedelta
@@ -865,10 +866,27 @@ def _ps_response(script: str, filename: str):
 DEPLOY_API_TOKEN = os.environ.get("DEPLOY_API_TOKEN", "")
 
 
+async def get_deploy_token() -> str:
+    doc = await db.config.find_one({"key": "deploy"})
+    if doc and doc.get("token"):
+        return doc["token"]
+    return DEPLOY_API_TOKEN
+
+
+def _deploy_urls(tok: str) -> dict:
+    base = BACKEND_PUBLIC_URL.rstrip("/")
+    return {
+        "has_token": bool(tok),
+        "exchange_url": f"{base}/api/deploy/exchange-script?token={tok}" if tok else "",
+        "gpo_url": f"{base}/api/deploy/gpo-script?token={tok}" if tok else "",
+    }
+
+
 async def deploy_auth(request: Request, token: Optional[str] = Query(default=None),
                       creds: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     """Allow either an admin JWT (interactive UI) or a static token (unattended scheduled tasks)."""
-    if DEPLOY_API_TOKEN and token and token == DEPLOY_API_TOKEN:
+    current = await get_deploy_token()
+    if current and token and token == current:
         return {"role": "admin", "via": "token"}
     user = await get_current_user(request, creds)
     if user.get("role") != "admin":
@@ -878,13 +896,14 @@ async def deploy_auth(request: Request, token: Optional[str] = Query(default=Non
 
 @api_router.get("/deploy/info")
 async def deploy_info(admin: dict = Depends(require_admin)):
-    base = BACKEND_PUBLIC_URL.rstrip("/")
-    tok = DEPLOY_API_TOKEN
-    return {
-        "has_token": bool(tok),
-        "exchange_url": f"{base}/api/deploy/exchange-script?token={tok}" if tok else "",
-        "gpo_url": f"{base}/api/deploy/gpo-script?token={tok}" if tok else "",
-    }
+    return _deploy_urls(await get_deploy_token())
+
+
+@api_router.post("/deploy/rotate-token")
+async def rotate_deploy_token(admin: dict = Depends(require_admin)):
+    new_token = secrets.token_urlsafe(24)
+    await db.config.update_one({"key": "deploy"}, {"$set": {"token": new_token}}, upsert=True)
+    return _deploy_urls(new_token)
 
 
 @api_router.get("/deploy/exchange-script")

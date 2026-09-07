@@ -1,10 +1,11 @@
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { PenLine, Palette, Images, Users, LogOut, Sparkles, Mail, BarChart3, Cloud, Server } from "lucide-react";
+import { PenLine, Palette, Images, Users, LogOut, Sparkles, Mail, BarChart3, Cloud, Server, Rocket } from "lucide-react";
 
 const navItems = [
   { to: "/app/signature", label: "Ma signature", icon: PenLine, testid: "nav-employee-portal", roles: ["admin", "employee"] },
+  { to: "/app/setup", label: "Assistant", icon: Rocket, testid: "nav-setup", roles: ["admin"] },
   { to: "/app/brand", label: "Charte graphique", icon: Palette, testid: "nav-brand-assets", roles: ["admin"] },
   { to: "/app/gif", label: "Bannières & GIF", icon: Images, testid: "nav-gif-composer", roles: ["admin"] },
   { to: "/app/employees", label: "Employés", icon: Users, testid: "nav-employees", roles: ["admin"] },

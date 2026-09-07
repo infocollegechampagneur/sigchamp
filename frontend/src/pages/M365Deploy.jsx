@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/apiClient";
 import { Button } from "@/components/ui/button";
-import { Download, Loader2, ServerCog, MonitorCog, ShieldCheck, RefreshCw, Copy } from "lucide-react";
+import { Download, Loader2, ServerCog, MonitorCog, ShieldCheck, RefreshCw, Copy, RotateCcw } from "lucide-react";
 
 function useDownload() {
   const [loading, setLoading] = useState(null);
@@ -33,6 +33,17 @@ export default function M365Deploy() {
   useEffect(() => { api.get("/deploy/info").then((r) => setInfo(r.data)).catch(() => {}); }, []);
 
   const copy = (txt) => { navigator.clipboard.writeText(txt); toast.success("URL copiée."); };
+
+  const [rotating, setRotating] = useState(false);
+  const rotate = async () => {
+    if (!window.confirm("Régénérer le jeton invalidera immédiatement les anciennes URL d'automatisation. Continuer ?")) return;
+    setRotating(true);
+    try {
+      const { data } = await api.post("/deploy/rotate-token");
+      setInfo(data);
+      toast.success("Nouveau jeton généré. Mettez à jour vos tâches planifiées.");
+    } catch { toast.error("Échec de la rotation du jeton."); } finally { setRotating(false); }
+  };
 
   return (
     <div className="max-w-5xl mx-auto px-5 lg:px-8 py-8">
@@ -91,6 +102,11 @@ export default function M365Deploy() {
         <div className="flex items-center gap-2 mb-2">
           <RefreshCw className="h-5 w-5 text-blue-400" />
           <h3 className="font-display text-xl font-bold text-white">Régénération automatique</h3>
+          {info?.has_token && (
+            <button onClick={rotate} disabled={rotating} data-testid="button-rotate-token" className="ml-auto flex items-center gap-1.5 text-xs text-amber-300 hover:text-amber-200 border border-amber-500/40 bg-amber-500/10 rounded-lg px-2.5 py-1.5 transition-colors">
+              {rotating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />} Régénérer le jeton
+            </button>
+          )}
         </div>
         <p className="text-sm text-slate-400 mb-4">
           Ces URL renvoient <b className="text-slate-200">toujours la version la plus à jour</b> des scripts (signatures + employés courants).
