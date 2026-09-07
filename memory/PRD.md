@@ -64,6 +64,13 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
 - **Bug** : push signature vers M365 échouait sans raison visible (toast « échec », backend renvoyait des octets nuls). **Cause racine** : Exchange Online (InvokeCommand REST) renvoie **401** — le jeton app-only est valide mais l'application Azure n'a **pas** la permission d'exécuter des commandes Exchange (manque `Office 365 Exchange Online → Exchange.ManageAsApp` + rôle « Exchange Administrator »). Problème côté tenant, rendu non diagnosticable par l'app.
 - **Correctifs** : `_exo_error()` décode les réponses Exchange (401/403/autre) en message FR clair et actionnable ; `/api/m365/test` exécute réellement une commande Exchange (`Get-OrganizationConfig`) → le test reflète la vraie capacité de push ; le frontend affiche le motif exact par utilisateur (panneau rouge `m365-push-errors` + toast long). De-dup de la liste d'utilisateurs Graph. Vérifié par testing agent (100% backend + frontend).
 
+## Itération 8 — Section Système / Maintenance (2026-06)
+- Nouvelle page admin **« Système »** (`/app/system`, `SystemMaintenance.jsx`, réservée aux admins) avec :
+  - **État des services** (backend/frontend/mongodb, badges RUNNING) via `GET /api/system/status` (services internes plateforme masqués).
+  - **Rechargement léger** (`POST /api/system/reload`) : relit `.env` + vérifie MongoDB, **sans interruption**.
+  - **Redémarrage complet** backend + frontend (`POST /api/system/restart`) : exécution détachée via `RESTART_COMMAND` (défaut `sudo supervisorctl restart frontend backend`), configurable pour l'auto-hébergé (ex. `docker compose restart`). **Confirmation** obligatoire (AlertDialog).
+- Tous les endpoints `require_admin`. Vérifié par testing agent (100 %) + curl (restart réel confirmé : services relancés).
+
 ## Backlog / prochaines pistes
 - P1 : envoi automatique de la signature par courriel à chaque employé.
 - P1 : plusieurs modèles/mises en page de signature au choix.

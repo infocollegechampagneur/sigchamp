@@ -11,6 +11,7 @@ import uuid
 import asyncio
 import secrets
 import logging
+import subprocess
 import urllib.parse
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Annotated
@@ -45,6 +46,7 @@ EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
 APP_NAME = "sigflow"
 
 BACKEND_PUBLIC_URL = os.environ.get("REACT_APP_BACKEND_URL", "")
+_RESTART_COMMAND = os.environ.get("RESTART_COMMAND", "sudo supervisorctl restart frontend backend")
 
 STORAGE_BACKEND = (os.environ.get("STORAGE_BACKEND") or "emergent").strip().lower()
 LOCAL_STORAGE_DIR = Path(os.environ.get("LOCAL_STORAGE_DIR") or (ROOT_DIR / "storage"))
@@ -1436,6 +1438,44 @@ async def m365_remove(data: M365PushInput, admin: dict = Depends(require_admin))
         except Exception as e:
             failed.append({"email": email, "error": str(e)})
     return {"removed": removed, "failed": failed, "removed_count": len(removed)}
+
+
+@api_router.get("/system/status")
+async def system_status(admin: dict = Depends(require_admin)):
+    services = []
+    _hidden = {"code-server", "nginx-code-proxy", "webhook-crond"}
+    try:
+        out = subprocess.run(["sudo", "supervisorctl", "status"], capture_output=True, text=True, timeout=15).stdout
+        for line in out.strip().splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] not in _hidden:
+                services.append({"name": parts[0], "state": parts[1],
+                                 "info": " ".join(parts[2:])})
+    except Exception as e:
+        return {"services": [], "error": str(e), "restart_command": _RESTART_COMMAND}
+    return {"services": services, "restart_command": _RESTART_COMMAND}
+
+
+@api_router.post("/system/reload")
+async def system_reload(admin: dict = Depends(require_admin)):
+    """Rechargement léger : relit la configuration (.env) et vérifie les données, sans couper le service."""
+    load_dotenv(ROOT_DIR / ".env", override=True)
+    await load_settings()
+    await db.command("ping")
+    return {"ok": True, "message": "Configuration rechargée et connexion à la base vérifiée. Aucune interruption de service."}
+
+
+@api_router.post("/system/restart")
+async def system_restart(admin: dict = Depends(require_admin)):
+    """Redémarrage complet des services backend + frontend. Fonctionne dans l'aperçu (supervisor)
+    et en auto-hébergé (définir RESTART_COMMAND, ex. 'docker compose restart')."""
+    def _do_restart():
+        try:
+            subprocess.Popen(f"sleep 1 && {_RESTART_COMMAND}", shell=True, start_new_session=True)
+        except Exception as e:
+            logger.error(f"Restart failed: {e}")
+    _do_restart()
+    return {"ok": True, "message": "Redémarrage des services lancé. Le service sera de nouveau disponible dans quelques secondes."}
 
 
 @api_router.get("/")
