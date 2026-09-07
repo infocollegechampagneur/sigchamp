@@ -8,6 +8,7 @@ load_dotenv(ROOT_DIR / '.env')
 import io
 import csv
 import uuid
+import asyncio
 import secrets
 import logging
 import urllib.parse
@@ -196,6 +197,7 @@ class DeptBanner(BaseModel):
     gif_url: str = ""
     gif_version: int = 0
     banner_link: str = ""
+    layout: str = ""
 
 
 class CompanySettings(BaseModel):
@@ -207,6 +209,7 @@ class CompanySettings(BaseModel):
     address: str = ""
     disclaimer: str = ""
     primary_color: str = "#2563EB"
+    signature_layout: str = "classic"
     social: SocialLinks = Field(default_factory=SocialLinks)
     gif_images: List[str] = Field(default_factory=list)
     gif_interval_ms: int = 2500
@@ -280,6 +283,7 @@ class GifGenerateInput(BaseModel):
     interval_ms: int = 2500
     department_id: Optional[str] = None
     banner_link: Optional[str] = None
+    layout: Optional[str] = None
 
 
 def _oid(v: str) -> ObjectId:
@@ -459,6 +463,8 @@ async def generate_gif(data: GifGenerateInput, admin: dict = Depends(require_adm
                        "gif_url": gif_url, "gif_version": version})
         if data.banner_link is not None:
             target["banner_link"] = data.banner_link
+        if data.layout is not None:
+            target["layout"] = data.layout
         await db.settings.update_one({"key": "global"}, {"$set": {"department_banners": banners}})
         return {"gif_url": gif_url, "version": version, "frames": len(frames)}
 
@@ -470,6 +476,8 @@ async def generate_gif(data: GifGenerateInput, admin: dict = Depends(require_adm
               "gif_url": gif_url, "gif_version": version}
     if data.banner_link is not None:
         update["banner_link"] = data.banner_link
+    if data.layout is not None:
+        update["signature_layout"] = data.layout
     await db.settings.update_one({"key": "global"}, {"$set": update}, upsert=True)
     return {"gif_url": gif_url, "version": version, "frames": len(frames)}
 
@@ -496,10 +504,14 @@ _SOCIAL = {"linkedin": ("LinkedIn", "#0A66C2"), "twitter": ("X", "#111827"),
 
 def _resolve_banner(user, s):
     dept = (user.get("department") or "").strip().lower()
+    default_layout = s.get("signature_layout") or "classic"
     for b in s.get("department_banners", []):
-        if (b.get("name") or "").strip().lower() == dept and b.get("gif_url"):
-            return {"gif_url": b["gif_url"], "banner_link": b.get("banner_link", ""), "key": b.get("name")}
-    return {"gif_url": s.get("gif_url", ""), "banner_link": s.get("banner_link", ""), "key": "Défaut"}
+        if (b.get("name") or "").strip().lower() == dept:
+            return {"gif_url": b.get("gif_url", "") or s.get("gif_url", ""),
+                    "banner_link": b.get("banner_link", "") or s.get("banner_link", ""),
+                    "key": b.get("name"), "layout": b.get("layout") or default_layout}
+    return {"gif_url": s.get("gif_url", ""), "banner_link": s.get("banner_link", ""),
+            "key": "Défaut", "layout": default_layout}
 
 
 def build_signature_html(user, s):
@@ -553,9 +565,37 @@ def build_signature_html(user, s):
         + social_row
         + "</table></td>"
     )
-    rows = [f"<tr>{logo_cell}{identity}</tr>"]
-
+    rows = []
     banner = _resolve_banner(user, s)
+    layout = banner.get("layout") or "classic"
+
+    if layout == "modern":
+        parts = []
+        if phone_str:
+            parts.append(f'<span style="color:{color};font-weight:700;">Tél</span> {phone_str}')
+        if direct:
+            parts.append(f'<span style="color:{color};font-weight:700;">Direct</span> {direct}')
+        if email:
+            parts.append(f'<a href="mailto:{email}" style="color:#1f2937;text-decoration:none;">{email}</a>')
+        if website:
+            parts.append(f'<a href="{_esc(_norm_url(website))}" style="color:#1f2937;text-decoration:none;">{_esc(website)}</a>')
+        contact_inline = ' &nbsp;<span style="color:#d1d5db;">·</span>&nbsp; '.join(parts)
+        logo_html = f'<img src="{_esc(logo)}" width="52" style="display:block;width:52px;border-radius:6px;margin-bottom:8px;" alt="{company}" />' if logo else ""
+        modern = (
+            f'<td colspan="2" style="border-left:4px solid {color};padding:2px 0 2px 16px;">'
+            f'{logo_html}'
+            f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:800;color:#0f172a;">{name}</div>'
+            + (f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:{color};padding-top:1px;">{title_line}</div>' if title_line else "")
+            + (f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-top:1px;">{company}</div>' if company else "")
+            + (f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#374151;padding-top:6px;">{contact_inline}</div>' if contact_inline else "")
+            + (f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#6b7280;padding-top:2px;">{address}</div>' if address else "")
+            + (f'<div style="padding-top:6px;">{sep.join(social_links)}</div>' if social_links else "")
+            + '</td>'
+        )
+        rows.append(f"<tr>{modern}</tr>")
+    else:
+        rows.append(f"<tr>{logo_cell}{identity}</tr>")
+
     if banner["gif_url"]:
         img = f'<img src="{_esc(banner["gif_url"])}" width="600" style="display:block;width:600px;max-width:100%;border-radius:8px;border:0;" alt="Bannière" />'
         link = _norm_url(banner["banner_link"])
@@ -1078,6 +1118,139 @@ if ($signatures.ContainsKey($email)) {{
 }}
 """
     return _ps_response(script, "sigflow-outlook-gpo.ps1")
+
+
+# ---------------------------------------------------------------------------
+# Microsoft 365 direct connection (Graph list users + Exchange push)
+# ---------------------------------------------------------------------------
+class M365ConfigInput(BaseModel):
+    tenant_id: str = ""
+    client_id: str = ""
+    client_secret: Optional[str] = None
+    tenant_domain: str = ""
+
+
+class M365PushInput(BaseModel):
+    emails: List[str]
+    fallback: str = "Ignore"
+
+
+async def _m365_cfg():
+    return await db.config.find_one({"key": "m365"}) or {}
+
+
+def _m365_token(cfg: dict, scope: str) -> str:
+    r = requests.post(
+        f"https://login.microsoftonline.com/{cfg['tenant_id']}/oauth2/v2.0/token",
+        data={"client_id": cfg["client_id"], "client_secret": cfg.get("client_secret", ""),
+              "scope": scope, "grant_type": "client_credentials"}, timeout=30)
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Auth M365 échouée : {r.text[:300]}")
+    return r.json()["access_token"]
+
+
+def _graph_list_users(cfg: dict) -> list:
+    tok = _m365_token(cfg, "https://graph.microsoft.com/.default")
+    url = "https://graph.microsoft.com/v1.0/users?$select=id,displayName,userPrincipalName,mail,accountEnabled&$top=999"
+    out = []
+    while url:
+        r = requests.get(url, headers={"Authorization": f"Bearer {tok}"}, timeout=30)
+        if r.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Graph : {r.text[:300]}")
+        body = r.json()
+        for u in body.get("value", []):
+            out.append({"id": u["id"], "name": u.get("displayName") or "",
+                        "email": u.get("mail") or u.get("userPrincipalName") or "",
+                        "enabled": u.get("accountEnabled", True)})
+        url = body.get("@odata.nextLink")
+    return out
+
+
+def _exo_invoke(cfg: dict, cmdlet: str, params: dict):
+    tok = _m365_token(cfg, "https://outlook.office365.com/.default")
+    dom = cfg["tenant_domain"]
+    headers = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json",
+               "X-AnchorMailbox": f"APP:SystemMailbox{{bb558c35-97f1-4cb9-8ff7-d53741dc928c}}@{dom}"}
+    return requests.post(f"https://outlook.office365.com/adminapi/beta/{dom}/InvokeCommand",
+                         headers=headers, json={"CmdletInput": {"CmdletName": cmdlet, "Parameters": params}}, timeout=60)
+
+
+@api_router.get("/m365/config")
+async def get_m365_config(admin: dict = Depends(require_admin)):
+    cfg = await _m365_cfg()
+    return {"tenant_id": cfg.get("tenant_id", ""), "client_id": cfg.get("client_id", ""),
+            "tenant_domain": cfg.get("tenant_domain", ""), "has_secret": bool(cfg.get("client_secret")),
+            "connected": bool(cfg.get("tenant_id") and cfg.get("client_id") and cfg.get("client_secret"))}
+
+
+@api_router.put("/m365/config")
+async def put_m365_config(data: M365ConfigInput, admin: dict = Depends(require_admin)):
+    existing = await _m365_cfg()
+    payload = {"key": "m365", "tenant_id": data.tenant_id.strip(), "client_id": data.client_id.strip(),
+               "tenant_domain": data.tenant_domain.strip()}
+    if data.client_secret:
+        payload["client_secret"] = data.client_secret
+    elif existing.get("client_secret"):
+        payload["client_secret"] = existing["client_secret"]
+    await db.config.update_one({"key": "m365"}, {"$set": payload}, upsert=True)
+    return {"ok": True}
+
+
+@api_router.get("/m365/users")
+async def m365_users(admin: dict = Depends(require_admin)):
+    cfg = await _m365_cfg()
+    if not cfg.get("client_secret"):
+        raise HTTPException(status_code=400, detail="Microsoft 365 non configuré.")
+    users = await asyncio.to_thread(_graph_list_users, cfg)
+    known = {u["email"].lower() async for u in _iter_employee_emails()}
+    for u in users:
+        u["has_employee"] = u["email"].lower() in known
+    return users
+
+
+async def _iter_employee_emails():
+    for u in await db.users.find({}, {"email": 1}).to_list(2000):
+        yield {"email": u.get("email", "")}
+
+
+@api_router.post("/m365/push")
+async def m365_push(data: M365PushInput, admin: dict = Depends(require_admin)):
+    cfg = await _m365_cfg()
+    if not cfg.get("client_secret") or not cfg.get("tenant_domain"):
+        raise HTTPException(status_code=400, detail="Microsoft 365 non configuré (domaine + identifiants requis).")
+    if data.fallback not in ("Wrap", "Ignore", "Reject"):
+        data.fallback = "Ignore"
+    settings = await load_settings()
+    applied, failed = [], []
+    for email in data.emails:
+        email = email.strip().lower()
+        if not email:
+            continue
+        emp = await db.users.find_one({"email": email})
+        user = {**(emp or {}), "email": email, "id": str(emp["_id"]) if emp else None,
+                "name": (emp or {}).get("name") or email.split("@")[0]}
+        html = build_signature_html(user, settings)
+        rule = f"SigFlow - {email}"
+        params = {"Name": rule, "From": [email], "ApplyHtmlDisclaimerText": html,
+                  "ApplyHtmlDisclaimerLocation": "Append", "ApplyHtmlDisclaimerFallbackAction": data.fallback}
+        try:
+            r = await asyncio.to_thread(_exo_invoke, cfg, "New-TransportRule", params)
+            if r.status_code >= 400 and ("already exists" in r.text or "existe" in r.text or r.status_code == 400):
+                sparams = {"Identity": rule, "From": [email], "ApplyHtmlDisclaimerText": html,
+                           "ApplyHtmlDisclaimerLocation": "Append", "ApplyHtmlDisclaimerFallbackAction": data.fallback}
+                r = await asyncio.to_thread(_exo_invoke, cfg, "Set-TransportRule", sparams)
+            if r.status_code < 300:
+                applied.append(email)
+                if emp:
+                    await db.users.update_one({"_id": emp["_id"]},
+                                              {"$set": {"m365_pushed_at": datetime.now(timezone.utc).isoformat()}})
+            else:
+                failed.append({"email": email, "error": r.text[:200]})
+        except HTTPException as e:
+            failed.append({"email": email, "error": str(e.detail)})
+        except Exception as e:
+            failed.append({"email": email, "error": str(e)})
+    return {"applied": applied, "failed": failed, "applied_count": len(applied)}
 
 
 @api_router.get("/")

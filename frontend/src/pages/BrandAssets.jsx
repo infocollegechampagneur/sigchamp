@@ -118,6 +118,19 @@ export default function BrandAssets() {
               </div>
             </div>
             <div className="mt-4">
+              <Label className="text-slate-300">Mise en page de la signature (par défaut)</Label>
+              <select
+                data-testid="select-signature-layout"
+                value={s.signature_layout || "classic"}
+                onChange={set("signature_layout")}
+                className="mt-1.5 w-full h-10 rounded-md bg-slate-800/60 border border-slate-700 text-white px-3 text-sm"
+              >
+                <option value="classic">Classique — logo à gauche, filet coloré</option>
+                <option value="modern">Moderne — bloc à bordure, coordonnées en ligne</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1.5">Chaque département peut avoir sa propre mise en page dans « Bannières &amp; GIF ».</p>
+            </div>
+            <div className="mt-4">
               <Label className="text-slate-300">Adresse de l'entreprise</Label>
               <Input data-testid="input-company-address" value={s.address} onChange={set("address")} placeholder="123 rue Principale, Montréal, QC H2X 1Y6" className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
             </div>

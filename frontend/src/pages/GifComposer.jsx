@@ -22,11 +22,13 @@ export default function GifComposer() {
       key: "default", id: null, name: "Bannière par défaut",
       slides: (d.gif_images || []).map((p) => ({ path: p, url: urlFor(p) })),
       interval: d.gif_interval_ms || 2500, gif_url: d.gif_url || "", banner_link: d.banner_link || "",
+      layout: d.signature_layout || "classic",
     };
     const depts = (d.department_banners || []).map((b) => ({
       key: b.id, id: b.id, name: b.name,
       slides: (b.gif_images || []).map((p) => ({ path: p, url: urlFor(p) })),
       interval: b.gif_interval_ms || 2500, gif_url: b.gif_url || "", banner_link: b.banner_link || "",
+      layout: b.layout || d.signature_layout || "classic",
     }));
     return [def, ...depts];
   }, []);
@@ -106,6 +108,7 @@ export default function GifComposer() {
         interval_ms: current.interval,
         department_id: current.id,
         banner_link: current.banner_link,
+        layout: current.layout,
       });
       patch({ gif_url: data.gif_url });
       toast.success(`Bannière « ${current.name} » générée (${data.frames} image(s)). Appliquée à tous.`);
@@ -227,8 +230,19 @@ export default function GifComposer() {
               onChange={(e) => patch({ banner_link: e.target.value })}
               placeholder="https://entreprise.com/promo"
               data-testid="input-banner-link"
-              className="mt-1.5 mb-5 bg-slate-800/60 border-slate-700 text-white"
+              className="mt-1.5 mb-4 bg-slate-800/60 border-slate-700 text-white"
             />
+
+            <Label className="text-slate-300">Mise en page de cette bannière</Label>
+            <select
+              value={current.layout || "classic"}
+              onChange={(e) => patch({ layout: e.target.value })}
+              data-testid="select-banner-layout"
+              className="mt-1.5 mb-5 w-full h-10 rounded-md bg-slate-800/60 border border-slate-700 text-white px-3 text-sm"
+            >
+              <option value="classic">Classique</option>
+              <option value="modern">Moderne</option>
+            </select>
 
             <Button onClick={generate} disabled={generating || !current.slides?.length} data-testid="button-generate-gif" className="w-full h-12 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-base">
               {generating ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <Wand2 className="h-5 w-5 mr-2" />}

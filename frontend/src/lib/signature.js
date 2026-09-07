@@ -25,9 +25,10 @@ const SOCIAL_META = {
 export function resolveBanner(user = {}, s = {}) {
   const dept = (user.department || "").trim().toLowerCase();
   const list = s.department_banners || [];
-  const match = list.find((b) => (b.name || "").trim().toLowerCase() === dept && b.gif_url);
-  if (match) return { gif_url: match.gif_url, banner_link: match.banner_link, key: match.name };
-  return { gif_url: s.gif_url || "", banner_link: s.banner_link || "", key: "Défaut" };
+  const defLayout = s.signature_layout || "classic";
+  const match = list.find((b) => (b.name || "").trim().toLowerCase() === dept);
+  if (match) return { gif_url: match.gif_url || s.gif_url || "", banner_link: match.banner_link || s.banner_link || "", key: match.name, layout: match.layout || defLayout };
+  return { gif_url: s.gif_url || "", banner_link: s.banner_link || "", key: "Défaut", layout: defLayout };
 }
 
 export function buildSignatureHtml(user = {}, s = {}) {
@@ -99,9 +100,28 @@ export function buildSignatureHtml(user = {}, s = {}) {
       </table>
     </td>`;
 
-  rows.push(`<tr>${logoCell}${identityCell}</tr>`);
-
-  // GIF banner (rotating images), clickable + click tracking when a real user id exists
+  if ((banner.layout || "classic") === "modern") {
+    const parts = [];
+    if (phoneStr) parts.push(`<span style="color:${color};font-weight:700;">Tél</span> ${phoneStr}`);
+    if (direct) parts.push(`<span style="color:${color};font-weight:700;">Direct</span> ${direct}`);
+    if (email) parts.push(`<a href="mailto:${email}" style="color:${textColor};text-decoration:none;">${email}</a>`);
+    if (website) parts.push(`<a href="${esc(normUrl(website))}" style="color:${textColor};text-decoration:none;">${esc(website.replace(/^https?:\/\//i, ""))}</a>`);
+    const contactInline = parts.join(' &nbsp;<span style="color:#d1d5db;">·</span>&nbsp; ');
+    const logoHtml = logo ? `<img src="${esc(logo)}" width="52" style="display:block;width:52px;border-radius:6px;margin-bottom:8px;" alt="${company}" />` : "";
+    const modern =
+      `<td colspan="2" style="border-left:4px solid ${color};padding:2px 0 2px 16px;">` +
+      logoHtml +
+      `<div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:800;color:#0f172a;">${name}</div>` +
+      (titleLine ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:${color};padding-top:1px;">${titleLine}</div>` : "") +
+      (company ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-top:1px;">${company}</div>` : "") +
+      (contactInline ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#374151;padding-top:6px;">${contactInline}</div>` : "") +
+      (address ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${mutedColor};padding-top:2px;">${address}</div>` : "") +
+      (socialLinks.length ? `<div style="padding-top:6px;">${socialLinks.join(' <span style="color:#d1d5db;">|</span> ')}</div>` : "") +
+      `</td>`;
+    rows.push(`<tr>${modern}</tr>`);
+  } else {
+    rows.push(`<tr>${logoCell}${identityCell}</tr>`);
+  }
   if (gifUrl) {
     const img = `<img src="${esc(gifUrl)}" width="600" style="display:block;width:600px;max-width:100%;border-radius:8px;border:0;" alt="Bannière" />`;
     let banner_html = img;
