@@ -14,6 +14,32 @@ function normUrl(u) {
   return `https://${t}`;
 }
 
+function hexToRgb(h) {
+  let x = String(h || "").replace("#", "").trim();
+  if (x.length === 3) x = x.split("").map((c) => c + c).join("");
+  if (x.length !== 6) return [37, 99, 235];
+  const n = parseInt(x, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function luminance(rgb) {
+  return (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+}
+function lighten(hex, f) {
+  const [r, g, b] = hexToRgb(hex);
+  const L = (v) => Math.round(v + (255 - v) * f);
+  return `rgb(${L(r)},${L(g)},${L(b)})`;
+}
+// Accent color adapted for dark backgrounds (lightened when too dark to read).
+export function darkAccentFor(primary) {
+  return luminance(hexToRgb(primary)) < 0.55 ? lighten(primary, 0.6) : primary;
+}
+// Rules applied both for OS dark clients (@media) and the in-app preview (.sf-dark scope).
+function darkStyleBlock(accent) {
+  const r = `.sf-name{color:#f8fafc!important}.sf-text{color:#e5e7eb!important}.sf-text a{color:#e5e7eb!important}.sf-muted{color:#9ca3af!important}.sf-disc{color:#94a3b8!important}.sf-disc-line{border-top-color:#334155!important}.sf-accent{color:${accent}!important}.sf-social{color:#e5e7eb!important}.sf-bar{border-right-color:${accent}!important}.sf-bar-left{border-left-color:${accent}!important}`;
+  const scoped = r.replace(/\.sf-/g, ".sf-dark .sf-");
+  return `<style>@media (prefers-color-scheme:dark){${r}}${scoped}</style>`;
+}
+
 const SOCIAL_META = {
   linkedin: { label: "LinkedIn", color: "#0A66C2" },
   twitter: { label: "X", color: "#111827" },
@@ -84,23 +110,23 @@ export function buildSignatureHtml(user = {}, s = {}) {
         const icon = `${BACKEND}/api/social-icons/${k}.png`;
         return `<a href="${href}" style="text-decoration:none;display:inline-block;" target="_blank"><img src="${icon}" width="24" height="24" style="display:inline-block;border:0;width:24px;height:24px;vertical-align:middle;border-radius:5px;" alt="${meta.label}" /></a>`;
       }
-      return `<a href="${href}" style="color:${meta.color};text-decoration:none;font-weight:600;font-size:12px;" target="_blank">${meta.label}</a>`;
+      return `<a href="${href}" class="sf-social" style="color:${meta.color};text-decoration:none;font-weight:600;font-size:12px;" target="_blank">${meta.label}</a>`;
     });
 
   const contactLines = [];
   if (phoneStr)
-    contactLines.push(`<tr><td style="padding:1px 0;font-size:13px;color:${textColor};"><span style="color:${color};font-weight:700;">Tél&nbsp;</span>${phoneStr}</td></tr>`);
+    contactLines.push(`<tr><td class="sf-text" style="padding:1px 0;font-size:13px;color:${textColor};"><span class="sf-accent" style="color:${color};font-weight:700;">Tél&nbsp;</span>${phoneStr}</td></tr>`);
   if (direct)
-    contactLines.push(`<tr><td style="padding:1px 0;font-size:13px;color:${textColor};"><span style="color:${color};font-weight:700;">Ligne directe&nbsp;</span>${direct}</td></tr>`);
+    contactLines.push(`<tr><td class="sf-text" style="padding:1px 0;font-size:13px;color:${textColor};"><span class="sf-accent" style="color:${color};font-weight:700;">Ligne directe&nbsp;</span>${direct}</td></tr>`);
   if (email)
-    contactLines.push(`<tr><td style="padding:1px 0;font-size:13px;"><span style="color:${color};font-weight:700;">Courriel&nbsp;</span><a href="mailto:${email}" style="color:${textColor};text-decoration:none;">${email}</a></td></tr>`);
+    contactLines.push(`<tr><td class="sf-text" style="padding:1px 0;font-size:13px;"><span class="sf-accent" style="color:${color};font-weight:700;">Courriel&nbsp;</span><a href="mailto:${email}" style="color:${textColor};text-decoration:none;">${email}</a></td></tr>`);
   if (website)
-    contactLines.push(`<tr><td style="padding:1px 0;font-size:13px;"><span style="color:${color};font-weight:700;">Web&nbsp;</span><a href="${esc(normUrl(website))}" style="color:${textColor};text-decoration:none;" target="_blank">${esc(website.replace(/^https?:\/\//i, ""))}</a></td></tr>`);
+    contactLines.push(`<tr><td class="sf-text" style="padding:1px 0;font-size:13px;"><span class="sf-accent" style="color:${color};font-weight:700;">Web&nbsp;</span><a href="${esc(normUrl(website))}" style="color:${textColor};text-decoration:none;" target="_blank">${esc(website.replace(/^https?:\/\//i, ""))}</a></td></tr>`);
   if (address)
-    contactLines.push(`<tr><td style="padding:1px 0;font-size:12px;color:${mutedColor};">${address}</td></tr>`);
+    contactLines.push(`<tr><td class="sf-muted" style="padding:1px 0;font-size:12px;color:${mutedColor};">${address}</td></tr>`);
 
   const logoCell = leftImg
-    ? `<td style="vertical-align:top;padding-right:18px;border-right:3px solid ${color};">
+    ? `<td class="sf-bar" style="vertical-align:top;padding-right:18px;border-right:3px solid ${color};">
          <img src="${esc(leftImg)}" width="${leftW}" style="display:block;width:${leftW}px;border-radius:6px;" alt="${company}" />
        </td>`
     : "";
@@ -113,9 +139,9 @@ export function buildSignatureHtml(user = {}, s = {}) {
     <td style="vertical-align:top;padding-left:${leftImg ? "18px" : "0"};">
       <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
         ${logoRow}
-        <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:800;color:#0f172a;padding-bottom:2px;">${name}</td></tr>
-        ${titleLine ? `<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:${color};padding-bottom:2px;">${titleLine}</td></tr>` : ""}
-        ${company ? `<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-bottom:6px;">${company}</td></tr>` : ""}
+        <tr><td class="sf-name" style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:800;color:#0f172a;padding-bottom:2px;">${name}</td></tr>
+        ${titleLine ? `<tr><td class="sf-accent" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:${color};padding-bottom:2px;">${titleLine}</td></tr>` : ""}
+        ${company ? `<tr><td class="sf-name" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-bottom:6px;">${company}</td></tr>` : ""}
         ${contactLines.join("")}
         ${socialLinks.length ? `<tr><td style="padding-top:6px;font-family:Arial,Helvetica,sans-serif;">${socialLinks.join(socialSep)}</td></tr>` : ""}
       </table>
@@ -123,8 +149,8 @@ export function buildSignatureHtml(user = {}, s = {}) {
 
   if ((banner.layout || "classic") === "modern") {
     const parts = [];
-    if (phoneStr) parts.push(`<span style="color:${color};font-weight:700;">Tél</span> ${phoneStr}`);
-    if (direct) parts.push(`<span style="color:${color};font-weight:700;">Direct</span> ${direct}`);
+    if (phoneStr) parts.push(`<span class="sf-accent" style="color:${color};font-weight:700;">Tél</span> ${phoneStr}`);
+    if (direct) parts.push(`<span class="sf-accent" style="color:${color};font-weight:700;">Direct</span> ${direct}`);
     if (email) parts.push(`<a href="mailto:${email}" style="color:${textColor};text-decoration:none;">${email}</a>`);
     if (website) parts.push(`<a href="${esc(normUrl(website))}" style="color:${textColor};text-decoration:none;">${esc(website.replace(/^https?:\/\//i, ""))}</a>`);
     const contactInline = parts.join(' &nbsp;<span style="color:#d1d5db;">·</span>&nbsp; ');
@@ -136,13 +162,13 @@ export function buildSignatureHtml(user = {}, s = {}) {
       (!avatar && companyLogo ? `<img src="${esc(companyLogo)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;margin-bottom:8px;" alt="${company}" />` : "");
     const modern =
       photoCell +
-      `<td${avatar ? "" : ' colspan="2"'} style="border-left:4px solid ${color};padding:2px 0 2px 16px;">` +
+      `<td${avatar ? "" : ' colspan="2"'} class="sf-bar-left" style="border-left:4px solid ${color};padding:2px 0 2px 16px;">` +
       contentLogo +
-      `<div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:800;color:#0f172a;">${name}</div>` +
-      (titleLine ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:${color};padding-top:1px;">${titleLine}</div>` : "") +
-      (company ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-top:1px;">${company}</div>` : "") +
-      (contactInline ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#374151;padding-top:6px;">${contactInline}</div>` : "") +
-      (address ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${mutedColor};padding-top:2px;">${address}</div>` : "") +
+      `<div class="sf-name" style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:800;color:#0f172a;">${name}</div>` +
+      (titleLine ? `<div class="sf-accent" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:${color};padding-top:1px;">${titleLine}</div>` : "") +
+      (company ? `<div class="sf-name" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-top:1px;">${company}</div>` : "") +
+      (contactInline ? `<div class="sf-text" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#374151;padding-top:6px;">${contactInline}</div>` : "") +
+      (address ? `<div class="sf-muted" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${mutedColor};padding-top:2px;">${address}</div>` : "") +
       (socialLinks.length ? `<div style="padding-top:6px;">${socialLinks.join(socialSep)}</div>` : "") +
       `</td>`;
     rows.push(`<tr>${modern}</tr>`);
@@ -163,10 +189,11 @@ export function buildSignatureHtml(user = {}, s = {}) {
 
   // Disclaimer
   if (disclaimer) {
-    rows.push(`<tr><td colspan="2" style="padding-top:14px;"><div style="border-top:1px solid #e5e7eb;padding-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:1.4;color:#9ca3af;max-width:600px;">${disclaimer}</div></td></tr>`);
+    rows.push(`<tr><td colspan="2" style="padding-top:14px;"><div class="sf-disc sf-disc-line" style="border-top:1px solid #e5e7eb;padding-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:1.4;color:#9ca3af;max-width:600px;">${disclaimer}</div></td></tr>`);
   }
 
-  return `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">${rows.join("")}</table>`;
+  const styleBlock = darkStyleBlock(darkAccentFor(color));
+  return `${styleBlock}<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">${rows.join("")}</table>`;
 }
 
 export const DEFAULT_DISCLAIMER =

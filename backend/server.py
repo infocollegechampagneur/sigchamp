@@ -528,6 +528,33 @@ def _norm_url(u):
     return t if t.lower().startswith(("http://", "https://")) else f"https://{t}"
 
 
+def _hex_to_rgb(h):
+    x = str(h or "").replace("#", "").strip()
+    if len(x) == 3:
+        x = "".join(c + c for c in x)
+    if len(x) != 6:
+        return (37, 99, 235)
+    return (int(x[0:2], 16), int(x[2:4], 16), int(x[4:6], 16))
+
+
+def _dark_accent_for(primary):
+    r, g, b = _hex_to_rgb(primary)
+    lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    if lum < 0.55:
+        f = 0.6
+        return f"rgb({round(r + (255 - r) * f)},{round(g + (255 - g) * f)},{round(b + (255 - b) * f)})"
+    return primary
+
+
+def _dark_style_block(accent):
+    r = (".sf-name{color:#f8fafc!important}.sf-text{color:#e5e7eb!important}.sf-text a{color:#e5e7eb!important}"
+         ".sf-muted{color:#9ca3af!important}.sf-disc{color:#94a3b8!important}.sf-disc-line{border-top-color:#334155!important}"
+         f".sf-accent{{color:{accent}!important}}.sf-social{{color:#e5e7eb!important}}"
+         f".sf-bar{{border-right-color:{accent}!important}}.sf-bar-left{{border-left-color:{accent}!important}}")
+    scoped = r.replace(".sf-", ".sf-dark .sf-")
+    return f"<style>@media (prefers-color-scheme:dark){{{r}}}{scoped}</style>"
+
+
 _SOCIAL = {"linkedin": ("LinkedIn", "#0A66C2"), "twitter": ("X", "#111827"),
            "facebook": ("Facebook", "#1877F2"), "instagram": ("Instagram", "#E1306C"),
            "youtube": ("YouTube", "#FF0000"), "tiktok": ("TikTok", "#111827")}
@@ -574,15 +601,15 @@ def build_signature_html(user, s):
 
     lines = []
     if phone_str:
-        lines.append(f'<tr><td style="padding:1px 0;font-size:13px;color:#1f2937;"><span style="color:{color};font-weight:700;">Tél&nbsp;</span>{phone_str}</td></tr>')
+        lines.append(f'<tr><td class="sf-text" style="padding:1px 0;font-size:13px;color:#1f2937;"><span class="sf-accent" style="color:{color};font-weight:700;">Tél&nbsp;</span>{phone_str}</td></tr>')
     if direct:
-        lines.append(f'<tr><td style="padding:1px 0;font-size:13px;color:#1f2937;"><span style="color:{color};font-weight:700;">Ligne directe&nbsp;</span>{direct}</td></tr>')
+        lines.append(f'<tr><td class="sf-text" style="padding:1px 0;font-size:13px;color:#1f2937;"><span class="sf-accent" style="color:{color};font-weight:700;">Ligne directe&nbsp;</span>{direct}</td></tr>')
     if email:
-        lines.append(f'<tr><td style="padding:1px 0;font-size:13px;"><span style="color:{color};font-weight:700;">Courriel&nbsp;</span><a href="mailto:{email}" style="color:#1f2937;text-decoration:none;">{email}</a></td></tr>')
+        lines.append(f'<tr><td class="sf-text" style="padding:1px 0;font-size:13px;"><span class="sf-accent" style="color:{color};font-weight:700;">Courriel&nbsp;</span><a href="mailto:{email}" style="color:#1f2937;text-decoration:none;">{email}</a></td></tr>')
     if website:
-        lines.append(f'<tr><td style="padding:1px 0;font-size:13px;"><span style="color:{color};font-weight:700;">Web&nbsp;</span><a href="{_esc(_norm_url(website))}" style="color:#1f2937;text-decoration:none;">{_esc(website)}</a></td></tr>')
+        lines.append(f'<tr><td class="sf-text" style="padding:1px 0;font-size:13px;"><span class="sf-accent" style="color:{color};font-weight:700;">Web&nbsp;</span><a href="{_esc(_norm_url(website))}" style="color:#1f2937;text-decoration:none;">{_esc(website)}</a></td></tr>')
     if address:
-        lines.append(f'<tr><td style="padding:1px 0;font-size:12px;color:#6b7280;">{address}</td></tr>')
+        lines.append(f'<tr><td class="sf-muted" style="padding:1px 0;font-size:12px;color:#6b7280;">{address}</td></tr>')
 
     social = s.get("social", {}) or {}
     icons_mode = (s.get("social_style") or "icons") == "icons"
@@ -594,20 +621,20 @@ def build_signature_html(user, s):
                 icon = f"{BACKEND_PUBLIC_URL}/api/social-icons/{k}.png"
                 social_links.append(f'<a href="{href}" style="text-decoration:none;display:inline-block;" target="_blank"><img src="{icon}" width="24" height="24" style="display:inline-block;border:0;width:24px;height:24px;vertical-align:middle;border-radius:5px;" alt="{label}" /></a>')
             else:
-                social_links.append(f'<a href="{href}" style="color:{c};text-decoration:none;font-weight:600;font-size:12px;">{label}</a>')
+                social_links.append(f'<a href="{href}" class="sf-social" style="color:{c};text-decoration:none;font-weight:600;font-size:12px;">{label}</a>')
     sep = "&nbsp;&nbsp;" if icons_mode else ' <span style="color:#d1d5db;">|</span> '
     social_row = f'<tr><td style="padding-top:6px;font-family:Arial,Helvetica,sans-serif;">{sep.join(social_links)}</td></tr>' if social_links else ""
 
-    logo_cell = (f'<td style="vertical-align:top;padding-right:18px;border-right:3px solid {color};">'
+    logo_cell = (f'<td class="sf-bar" style="vertical-align:top;padding-right:18px;border-right:3px solid {color};">'
                  f'<img src="{_esc(left_img)}" width="{left_w}" style="display:block;width:{left_w}px;border-radius:6px;" alt="{company}" /></td>') if left_img else ""
     logo_row = (f'<tr><td style="padding-bottom:8px;"><img src="{_esc(company_logo)}" width="{top_logo_w}" style="display:block;width:{top_logo_w}px;max-width:100%;border-radius:4px;" alt="{company}" /></td></tr>') if logo_in_identity else ""
     identity = (
         f'<td style="vertical-align:top;padding-left:{"18px" if left_img else "0"};">'
         f'<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
         f'{logo_row}'
-        f'<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:800;color:#0f172a;padding-bottom:2px;">{name}</td></tr>'
-        + (f'<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:{color};padding-bottom:2px;">{title_line}</td></tr>' if title_line else "")
-        + (f'<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-bottom:6px;">{company}</td></tr>' if company else "")
+        f'<tr><td class="sf-name" style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:800;color:#0f172a;padding-bottom:2px;">{name}</td></tr>'
+        + (f'<tr><td class="sf-accent" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:{color};padding-bottom:2px;">{title_line}</td></tr>' if title_line else "")
+        + (f'<tr><td class="sf-name" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-bottom:6px;">{company}</td></tr>' if company else "")
         + "".join(lines)
         + social_row
         + "</table></td>"
@@ -619,9 +646,9 @@ def build_signature_html(user, s):
     if layout == "modern":
         parts = []
         if phone_str:
-            parts.append(f'<span style="color:{color};font-weight:700;">Tél</span> {phone_str}')
+            parts.append(f'<span class="sf-accent" style="color:{color};font-weight:700;">Tél</span> {phone_str}')
         if direct:
-            parts.append(f'<span style="color:{color};font-weight:700;">Direct</span> {direct}')
+            parts.append(f'<span class="sf-accent" style="color:{color};font-weight:700;">Direct</span> {direct}')
         if email:
             parts.append(f'<a href="mailto:{email}" style="color:#1f2937;text-decoration:none;">{email}</a>')
         if website:
@@ -635,13 +662,13 @@ def build_signature_html(user, s):
         content_colspan = "" if avatar else ' colspan="2"'
         modern = (
             photo_cell
-            + f'<td{content_colspan} style="border-left:4px solid {color};padding:2px 0 2px 16px;">'
+            + f'<td{content_colspan} class="sf-bar-left" style="border-left:4px solid {color};padding:2px 0 2px 16px;">'
             f'{content_logo}'
-            f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:800;color:#0f172a;">{name}</div>'
-            + (f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:{color};padding-top:1px;">{title_line}</div>' if title_line else "")
-            + (f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-top:1px;">{company}</div>' if company else "")
-            + (f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#374151;padding-top:6px;">{contact_inline}</div>' if contact_inline else "")
-            + (f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#6b7280;padding-top:2px;">{address}</div>' if address else "")
+            f'<div class="sf-name" style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:800;color:#0f172a;">{name}</div>'
+            + (f'<div class="sf-accent" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:{color};padding-top:1px;">{title_line}</div>' if title_line else "")
+            + (f'<div class="sf-name" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-top:1px;">{company}</div>' if company else "")
+            + (f'<div class="sf-text" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#374151;padding-top:6px;">{contact_inline}</div>' if contact_inline else "")
+            + (f'<div class="sf-muted" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#6b7280;padding-top:2px;">{address}</div>' if address else "")
             + (f'<div style="padding-top:6px;">{sep.join(social_links)}</div>' if social_links else "")
             + '</td>'
         )
@@ -660,9 +687,10 @@ def build_signature_html(user, s):
         rows.append(f'<tr><td colspan="2" style="padding-top:16px;">{img}</td></tr>')
 
     if disclaimer:
-        rows.append(f'<tr><td colspan="2" style="padding-top:14px;"><div style="border-top:1px solid #e5e7eb;padding-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:1.4;color:#9ca3af;max-width:600px;">{disclaimer}</div></td></tr>')
+        rows.append(f'<tr><td colspan="2" style="padding-top:14px;"><div class="sf-disc sf-disc-line" style="border-top:1px solid #e5e7eb;padding-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:1.4;color:#9ca3af;max-width:600px;">{disclaimer}</div></td></tr>')
 
-    return f'<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">{"".join(rows)}</table>'
+    style_block = _dark_style_block(_dark_accent_for(color))
+    return f'{style_block}<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">{"".join(rows)}</table>'
 
 
 def _signature_file(sig_html):
