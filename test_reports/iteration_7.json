@@ -1,0 +1,16 @@
+{
+  "summary": "Verified the tenant_id GUID fix for M365 Exchange adminapi. Backend GET /api/m365/test now returns graph_ok=true and exchange_ok=true with no errors. POST /api/m365/push with s.lynch@champagneur.qc.ca returns applied_count=1, applied=['s.lynch@champagneur.qc.ca'], failed=[]. Running push twice in a row both succeed (idempotent remove+create). Frontend M365 page (/app/m365) shows 'Microsoft Graph (lister) : OK' AND 'Exchange (pousser) : OK' after clicking 'Tester la connexion'. Load users returned 1162 mailboxes; selecting s.lynch and clicking 'Pousser' completes without displaying the m365-push-errors panel. Real transport rule created in the customer's tenant as intended.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "informatique@champagneur.qc.ca / sig3713+",
+  "seed_data_creation": "None. A real Exchange transport rule 'SigChamp - s.lynch@champagneur.qc.ca' was created in the customer's live tenant (intended by the user).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Fix confirmed: _exo_invoke() now uses tenant_id GUID (not vanity domain) in the adminapi URL and X-AnchorMailbox header. Both /api/m365/test and /api/m365/push are fully green end-to-end against the real Microsoft 365 tenant. Login response field is 'token' (not access_token).",
+  "rca of the issue": "Exchange adminapi (https://outlook.office365.com/adminapi/beta/{tenant}/InvokeCommand) requires the tenant to be identified either by GUID or by the initial *.onmicrosoft.com domain in BOTH the URL path and the X-AnchorMailbox header. Using the vanity domain (champagneur.qc.ca) returned 401 Unauthorized even with a fully-permissioned app token (Exchange.ManageAsApp/V2 + admin consent + Exchange Administrator role). Fix in server.py _exo_invoke() switches to tenant_id GUID; verified live: test=OK, push=OK on both first and second call."
+}

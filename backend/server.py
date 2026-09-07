@@ -1256,10 +1256,12 @@ def _graph_list_users(cfg: dict) -> list:
 
 def _exo_invoke(cfg: dict, cmdlet: str, params: dict):
     tok = _m365_token(cfg, "https://outlook.office365.com/.default")
-    dom = cfg["tenant_domain"]
+    # L'API adminapi Exchange n'accepte PAS un domaine vanité (ex. champagneur.qc.ca) => 401.
+    # On cible le tenant par son GUID, qui est toujours accepté.
+    tid = cfg["tenant_id"]
     headers = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json",
-               "X-AnchorMailbox": f"APP:SystemMailbox{{bb558c35-97f1-4cb9-8ff7-d53741dc928c}}@{dom}"}
-    return requests.post(f"https://outlook.office365.com/adminapi/beta/{dom}/InvokeCommand",
+               "X-AnchorMailbox": f"APP:SystemMailbox{{bb558c35-97f1-4cb9-8ff7-d53741dc928c}}@{tid}"}
+    return requests.post(f"https://outlook.office365.com/adminapi/beta/{tid}/InvokeCommand",
                          headers=headers, json={"CmdletInput": {"CmdletName": cmdlet, "Parameters": params}}, timeout=60)
 
 

@@ -71,6 +71,10 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
   - **Redémarrage complet** backend + frontend (`POST /api/system/restart`) : exécution détachée via `RESTART_COMMAND` (défaut `sudo supervisorctl restart frontend backend`), configurable pour l'auto-hébergé (ex. `docker compose restart`). **Confirmation** obligatoire (AlertDialog).
 - Tous les endpoints `require_admin`. Vérifié par testing agent (100 %) + curl (restart réel confirmé : services relancés).
 
+## Itération 9 — Correctif push M365 (domaine vanité → GUID) (2026-06)
+- **Bug** : push Exchange bloqué en 401 malgré permissions correctes (Exchange.ManageAsApp + consentement + rôle Exchange Administrator). **Cause racine confirmée en direct** : l'appel adminapi InvokeCommand ciblait le tenant par son **domaine vanité** (`champagneur.qc.ca`) dans l'URL et l'en-tête `X-AnchorMailbox`, ce que l'API refuse (401). Le token contenait pourtant bien les rôles.
+- **Correctif** (`_exo_invoke`) : cibler le tenant par son **GUID (`tenant_id`)** dans l'URL et l'ancre (le domaine `.onmicrosoft.com` fonctionne aussi ; le GUID est le plus robuste). Vérifié par testing agent (100 %) : `/api/m365/test` → graph_ok + exchange_ok=true ; `/api/m365/push` vers s.lynch → applied_count=1 (règle réelle créée), idempotent ; UI « Exchange (pousser) : OK ».
+
 ## Backlog / prochaines pistes
 - P1 : envoi automatique de la signature par courriel à chaque employé.
 - P1 : plusieurs modèles/mises en page de signature au choix.
