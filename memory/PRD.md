@@ -79,6 +79,11 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
 - **Bug** : le push « réussissait » mais la signature n'apparaissait pas dans le compte Outlook. **Cause** : le push créait une **règle de flux Exchange** (ajout serveur au moment de l'envoi) = invisible dans l'interface Outlook.
 - **Correctif** : le push définit désormais la **vraie signature du compte** via `Set-MailboxMessageConfiguration` (`SignatureHtml` + `AutoAddSignature` + `AutoAddSignatureOnReply` + `AutoAddSignatureOnMobile` = true) → visible et ajoutée automatiquement dans **Outlook Web / Nouveau Outlook / Mobile**. Nettoyage automatique de l'ancienne règle de flux pour éviter les doublons. `m365_remove` efface la signature du compte + retire toute ancienne règle. Pour **Outlook classique de bureau** (signatures locales), utiliser le script GPO de « Déploiement M365 ». Vérifié par testing agent (100 %) et en réel sur s.lynch (AutoAddSignature=True, SignatureHtml défini, règle de flux supprimée 404).
 
+## Itération 11 — Enrichissement M365 (nom/poste/téléphone) + lien Bookings (2026-06)
+- **Nom / poste / téléphone depuis M365** : le push enrichit la signature via Microsoft Graph (`_graph_get_user`) — `displayName` (vrai nom affiché), `jobTitle` (poste), `department`, `businessPhones` (poste téléphonique, nettoyé du préfixe « x »), `mobilePhone`. Les valeurs d'une fiche employé existante restent prioritaires. ⚠️ Le poste (jobTitle) n'apparaît que s'il est **renseigné dans le profil M365/Azure** de l'utilisateur (vide chez s.lynch actuellement). Nom + poste téléphonique fonctionnent automatiquement.
+- **Lien Bookings** : nouveau champ optionnel `booking_url` (profil / « Ma signature »). Si renseigné, un bouton **« Réservez une heure pour me rencontrer »** s'affiche **en bas** de la signature (2 générateurs). Persisté via `PUT /auth/me`.
+- Vérifié par testing agent (100 %) + en réel : signature live de s.lynch = « Simon Lynch » + 247.
+
 ## Backlog / prochaines pistes
 - P1 : envoi automatique de la signature par courriel à chaque employé.
 - P1 : plusieurs modèles/mises en page de signature au choix.

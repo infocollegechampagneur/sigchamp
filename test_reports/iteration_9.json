@@ -1,0 +1,16 @@
+{
+  "summary": "Verified M365 Graph enrichment + booking_url profile feature. Backend pytest (3/3 pass): GET /api/m365/test => graph_ok=true, exchange_ok=true; POST /api/m365/push {emails:[s.lynch@champagneur.qc.ca]} => applied_count=1, applied=[s.lynch], failed=[]; PUT /api/auth/me {booking_url:'https://outlook.office.com/bookwithme/user/test'} persists and GET /api/auth/me returns it; PUT with empty string clears it. Frontend (/app/signature): input-employee-booking-url field present and wired. Setting URL + clicking button-save-profile causes 'Réservez une heure pour me rencontrer' red button to render at bottom of live SignaturePreview (verified via screenshot). Clearing URL and saving removes the button. Existing fields still save: input-employee-name='Simon Lynch', input-employee-title='Technicien en informatique', input-employee-phone-ext='247', direct_line, department, avatar all functional. Toast 'Vos informations sont enregistrées.' shown on save. No console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iteration9.py", "/app/test_reports/pytest/iteration9.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": ["/app/backend/tests/test_iteration9.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "informatique@champagneur.qc.ca / sig3713+",
+  "seed_data_creation": "Live M365 mailbox signature (re)applied to s.lynch@champagneur.qc.ca (intended, per problem statement).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login uses data-testid input-auth-email / input-auth-password / button-auth-submit (NOT input-login-*). Login response field is 'token'. When asserting 'Réservez une heure pour me rencontrer' presence in DOM, note that helper text under the booking_url field also contains this phrase — use a scoped selector like the signature preview iframe/container or check preview HTML only, not page.content(). Backend booking_url flow uses ProfileUpdate model with Optional[str] and empty-string clears it correctly.",
+  "rca of the issue": "N/A — verification-only run confirming main agent's fixes work end-to-end."
+}

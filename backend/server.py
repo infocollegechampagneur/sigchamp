@@ -252,6 +252,7 @@ class UserPublic(BaseModel):
     direct_line: str = ""
     department: str = ""
     avatar_url: str = ""
+    booking_url: str = ""
 
 
 class RegisterInput(BaseModel):
@@ -283,6 +284,7 @@ class ProfileUpdate(BaseModel):
     department: Optional[str] = None
     avatar_url: Optional[str] = None
     avatar_width: Optional[int] = None
+    booking_url: Optional[str] = None
 
 
 class GifGenerateInput(BaseModel):
@@ -312,6 +314,7 @@ def user_to_public(u: dict) -> dict:
         "department": u.get("department", ""),
         "avatar_url": u.get("avatar_url", ""),
         "avatar_width": int(u.get("avatar_width") or 0),
+        "booking_url": u.get("booking_url", ""),
         "signature_installed": bool(u.get("signature_installed", False)),
         "installed_at": u.get("installed_at"),
         "last_sent_at": u.get("last_sent_at"),
@@ -596,6 +599,7 @@ def build_signature_html(user, s):
     top_logo_w = min(logo_w + 30, 140)
     avatar_w = int(user.get("avatar_width") or 0) or logo_w
     left_w = avatar_w if avatar else logo_w
+    booking_url = _norm_url(user.get("booking_url") or "")
 
     title_line = " · ".join([x for x in [title, dept] if x])
     phone_parts = [p for p in [phone_main, (f"poste {ext}" if ext else "")] if p]
@@ -687,6 +691,9 @@ def build_signature_html(user, s):
         elif link:
             img = f'<a href="{_esc(link)}" target="_blank" style="text-decoration:none;">{img}</a>'
         rows.append(f'<tr><td colspan="2" style="padding-top:16px;">{img}</td></tr>')
+
+    if booking_url:
+        rows.append(f'<tr><td colspan="2" style="padding-top:12px;"><a href="{_esc(booking_url)}" target="_blank" style="display:inline-block;background:{color};color:#ffffff;text-decoration:none;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:700;padding:9px 16px;border-radius:6px;">Réservez une heure pour me rencontrer</a></td></tr>')
 
     if disclaimer:
         rows.append(f'<tr><td colspan="2" style="padding-top:14px;"><div class="sf-disc sf-disc-line" style="border-top:1px solid #e5e7eb;padding-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:1.4;color:#9ca3af;max-width:600px;">{disclaimer}</div></td></tr>')
@@ -1254,6 +1261,28 @@ def _graph_list_users(cfg: dict) -> list:
     return out
 
 
+def _clean_ext(phones):
+    if not phones:
+        return ""
+    v = phones[0] if isinstance(phones, list) else str(phones)
+    return v.strip().lstrip("xX").strip()
+
+
+def _graph_get_user(cfg: dict, email: str) -> dict:
+    """Récupère nom complet / poste / téléphone depuis Microsoft 365 pour enrichir la signature."""
+    try:
+        tok = _m365_token(cfg, "https://graph.microsoft.com/.default")
+        sel = "displayName,jobTitle,department,officeLocation,businessPhones,mobilePhone"
+        r = requests.get(
+            f"https://graph.microsoft.com/v1.0/users/{urllib.parse.quote(email)}?$select={sel}",
+            headers={"Authorization": f"Bearer {tok}"}, timeout=20)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return {}
+
+
 def _exo_invoke(cfg: dict, cmdlet: str, params: dict):
     tok = _m365_token(cfg, "https://outlook.office365.com/.default")
     # L'API adminapi Exchange n'accepte PAS un domaine vanité (ex. champagneur.qc.ca) => 401.
@@ -1347,8 +1376,19 @@ async def m365_push(data: M365PushInput, admin: dict = Depends(require_admin)):
         if not email:
             continue
         emp = await db.users.find_one({"email": email})
-        user = {**(emp or {}), "email": email, "id": str(emp["_id"]) if emp else None,
-                "name": (emp or {}).get("name") or email.split("@")[0]}
+        g = await asyncio.to_thread(_graph_get_user, cfg, email)
+        emp = emp or {}
+        user = {
+            **emp,
+            "email": email,
+            "id": str(emp["_id"]) if emp.get("_id") else None,
+            "name": emp.get("name") or g.get("displayName") or email.split("@")[0],
+            "title": emp.get("title") or g.get("jobTitle") or "",
+            "department": emp.get("department") or g.get("department") or "",
+            "phone_ext": emp.get("phone_ext") or _clean_ext(g.get("businessPhones")),
+            "direct_line": emp.get("direct_line") or g.get("mobilePhone") or "",
+            "booking_url": emp.get("booking_url") or "",
+        }
         html = build_signature_html(user, settings)
         rule = f"SigChamp - {email}"
         try:

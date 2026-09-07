@@ -76,6 +76,7 @@ export function buildSignatureHtml(user = {}, s = {}) {
   const website = s.website || "";
   const address = esc(s.address || "");
   const disclaimer = s.disclaimer || "";
+  const bookingUrl = user.booking_url ? normUrl(user.booking_url) : "";
   const avatar = user.avatar_url || "";
   const companyLogo = s.logo_url || "";
   const leftImg = avatar || companyLogo;
@@ -185,6 +186,11 @@ export function buildSignatureHtml(user = {}, s = {}) {
       banner_html = `<a href="${esc(bannerLink)}" target="_blank" style="text-decoration:none;">${img}</a>`;
     }
     rows.push(`<tr><td colspan="2" style="padding-top:16px;">${banner_html}</td></tr>`);
+  }
+
+  // Booking CTA
+  if (bookingUrl) {
+    rows.push(`<tr><td colspan="2" style="padding-top:12px;"><a href="${esc(bookingUrl)}" target="_blank" style="display:inline-block;background:${color};color:#ffffff;text-decoration:none;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:700;padding:9px 16px;border-radius:6px;">Réservez une heure pour me rencontrer</a></td></tr>`);
   }
 
   // Disclaimer

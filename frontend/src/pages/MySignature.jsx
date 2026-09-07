@@ -13,7 +13,7 @@ import { Upload, Save, Loader2, Trash2 } from "lucide-react";
 export default function MySignature() {
   const { user, refreshUser } = useAuth();
   const [settings, setSettings] = useState(null);
-  const [form, setForm] = useState({ name: "", title: "", phone_ext: "", direct_line: "", department: "", avatar_url: "", avatar_width: 0 });
+  const [form, setForm] = useState({ name: "", title: "", phone_ext: "", direct_line: "", department: "", avatar_url: "", avatar_width: 0, booking_url: "" });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -26,7 +26,7 @@ export default function MySignature() {
       setForm({
         name: user.name || "", title: user.title || "", phone_ext: user.phone_ext || "",
         direct_line: user.direct_line || "", department: user.department || "", avatar_url: user.avatar_url || "",
-        avatar_width: user.avatar_width || 0,
+        avatar_width: user.avatar_width || 0, booking_url: user.booking_url || "",
       });
   }, [user]);
 
@@ -160,6 +160,11 @@ export default function MySignature() {
               <div>
                 <Label className="text-slate-300">Ligne directe</Label>
                 <Input data-testid="input-employee-direct-line" value={form.direct_line} onChange={set("direct_line")} placeholder="514 555-0199" className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+              </div>
+              <div className="sm:col-span-2">
+                <Label className="text-slate-300">Lien « Réserver une réunion » (Bookings) <span className="text-slate-500">— optionnel</span></Label>
+                <Input data-testid="input-employee-booking-url" value={form.booking_url} onChange={set("booking_url")} placeholder="https://outlook.office.com/bookwithme/user/…" className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+                <p className="text-xs text-slate-500 mt-1.5">Si renseigné, un bouton « Réservez une heure pour me rencontrer » apparaît au bas de la signature.</p>
               </div>
               <div className="sm:col-span-2">
                 <Label className="text-slate-300">Courriel (compte)</Label>
