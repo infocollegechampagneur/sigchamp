@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { Upload, Save, Loader2, Linkedin, Twitter, Facebook, Instagram, Youtube } from "lucide-react";
 
 const SAMPLE_EMPLOYEE = {
@@ -115,6 +116,16 @@ export default function BrandAssets() {
                   <input type="color" value={s.primary_color} onChange={set("primary_color")} data-testid="input-primary-color" className="h-10 w-14 rounded-lg bg-slate-800/60 border border-slate-700 cursor-pointer" />
                   <Input value={s.primary_color} onChange={set("primary_color")} className="bg-slate-800/60 border-slate-700 text-white font-mono" />
                 </div>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4 mt-4">
+              <div>
+                <div className="flex justify-between"><Label className="text-slate-300">Taille du logo</Label><span className="text-xs font-mono text-blue-400">{s.logo_width || 86}px</span></div>
+                <Slider value={[s.logo_width || 86]} min={40} max={160} step={2} onValueChange={(v) => setS((p) => ({ ...p, logo_width: v[0] }))} className="mt-3" data-testid="slider-logo-width" />
+              </div>
+              <div>
+                <div className="flex justify-between"><Label className="text-slate-300">Largeur de la bannière</Label><span className="text-xs font-mono text-blue-400">{s.banner_width || 600}px</span></div>
+                <Slider value={[s.banner_width || 600]} min={200} max={600} step={10} onValueChange={(v) => setS((p) => ({ ...p, banner_width: v[0] }))} className="mt-3" data-testid="slider-banner-width" />
               </div>
             </div>
             <div className="mt-4">

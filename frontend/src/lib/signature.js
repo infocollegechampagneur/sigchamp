@@ -33,6 +33,8 @@ export function resolveBanner(user = {}, s = {}) {
 
 export function buildSignatureHtml(user = {}, s = {}) {
   const color = s.primary_color || "#2563EB";
+  const logoW = Number(s.logo_width) || 86;
+  const bannerW = Number(s.banner_width) || 600;
   const textColor = "#1f2937";
   const mutedColor = "#6b7280";
 
@@ -85,7 +87,7 @@ export function buildSignatureHtml(user = {}, s = {}) {
 
   const logoCell = logo
     ? `<td style="vertical-align:top;padding-right:18px;border-right:3px solid ${color};">
-         <img src="${esc(logo)}" width="86" style="display:block;width:86px;border-radius:6px;" alt="${company}" />
+         <img src="${esc(logo)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;" alt="${company}" />
        </td>`
     : "";
 
@@ -107,7 +109,7 @@ export function buildSignatureHtml(user = {}, s = {}) {
     if (email) parts.push(`<a href="mailto:${email}" style="color:${textColor};text-decoration:none;">${email}</a>`);
     if (website) parts.push(`<a href="${esc(normUrl(website))}" style="color:${textColor};text-decoration:none;">${esc(website.replace(/^https?:\/\//i, ""))}</a>`);
     const contactInline = parts.join(' &nbsp;<span style="color:#d1d5db;">·</span>&nbsp; ');
-    const logoHtml = logo ? `<img src="${esc(logo)}" width="52" style="display:block;width:52px;border-radius:6px;margin-bottom:8px;" alt="${company}" />` : "";
+    const logoHtml = logo ? `<img src="${esc(logo)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;margin-bottom:8px;" alt="${company}" />` : "";
     const modern =
       `<td colspan="2" style="border-left:4px solid ${color};padding:2px 0 2px 16px;">` +
       logoHtml +
@@ -123,7 +125,7 @@ export function buildSignatureHtml(user = {}, s = {}) {
     rows.push(`<tr>${logoCell}${identityCell}</tr>`);
   }
   if (gifUrl) {
-    const img = `<img src="${esc(gifUrl)}" width="600" style="display:block;width:600px;max-width:100%;border-radius:8px;border:0;" alt="Bannière" />`;
+    const img = `<img src="${esc(gifUrl)}" width="${bannerW}" style="display:block;width:${bannerW}px;max-width:100%;border-radius:8px;border:0;" alt="Bannière" />`;
     let banner_html = img;
     if (bannerLink && user.id) {
       const track = `${BACKEND}/api/track/click?u=${encodeURIComponent(user.id)}&b=${encodeURIComponent(banner.key || "Défaut")}&url=${encodeURIComponent(bannerLink)}`;

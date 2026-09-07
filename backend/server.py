@@ -210,6 +210,8 @@ class CompanySettings(BaseModel):
     disclaimer: str = ""
     primary_color: str = "#2563EB"
     signature_layout: str = "classic"
+    logo_width: int = 86
+    banner_width: int = 600
     social: SocialLinks = Field(default_factory=SocialLinks)
     gif_images: List[str] = Field(default_factory=list)
     gif_interval_ms: int = 2500
@@ -516,6 +518,8 @@ def _resolve_banner(user, s):
 
 def build_signature_html(user, s):
     color = s.get("primary_color") or "#2563EB"
+    logo_w = int(s.get("logo_width") or 86)
+    banner_w = int(s.get("banner_width") or 600)
     name = _esc(user.get("name") or "Nom Prénom")
     title = _esc(user.get("title") or "")
     dept = _esc(user.get("department") or "")
@@ -554,7 +558,7 @@ def build_signature_html(user, s):
     social_row = f'<tr><td style="padding-top:6px;font-family:Arial,Helvetica,sans-serif;">{sep.join(social_links)}</td></tr>' if social_links else ""
 
     logo_cell = (f'<td style="vertical-align:top;padding-right:18px;border-right:3px solid {color};">'
-                 f'<img src="{_esc(logo)}" width="86" style="display:block;width:86px;border-radius:6px;" alt="{company}" /></td>') if logo else ""
+                 f'<img src="{_esc(logo)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;" alt="{company}" /></td>') if logo else ""
     identity = (
         f'<td style="vertical-align:top;padding-left:{"18px" if logo else "0"};">'
         f'<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
@@ -580,7 +584,7 @@ def build_signature_html(user, s):
         if website:
             parts.append(f'<a href="{_esc(_norm_url(website))}" style="color:#1f2937;text-decoration:none;">{_esc(website)}</a>')
         contact_inline = ' &nbsp;<span style="color:#d1d5db;">·</span>&nbsp; '.join(parts)
-        logo_html = f'<img src="{_esc(logo)}" width="52" style="display:block;width:52px;border-radius:6px;margin-bottom:8px;" alt="{company}" />' if logo else ""
+        logo_html = f'<img src="{_esc(logo)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;margin-bottom:8px;" alt="{company}" />' if logo else ""
         modern = (
             f'<td colspan="2" style="border-left:4px solid {color};padding:2px 0 2px 16px;">'
             f'{logo_html}'
@@ -597,7 +601,7 @@ def build_signature_html(user, s):
         rows.append(f"<tr>{logo_cell}{identity}</tr>")
 
     if banner["gif_url"]:
-        img = f'<img src="{_esc(banner["gif_url"])}" width="600" style="display:block;width:600px;max-width:100%;border-radius:8px;border:0;" alt="Bannière" />'
+        img = f'<img src="{_esc(banner["gif_url"])}" width="{banner_w}" style="display:block;width:{banner_w}px;max-width:100%;border-radius:8px;border:0;" alt="Bannière" />'
         link = _norm_url(banner["banner_link"])
         if link and user.get("id"):
             track = f'{BACKEND_PUBLIC_URL}/api/track/click?u={_esc(user["id"])}&b={urllib.parse.quote(banner["key"] or "Défaut")}&url={urllib.parse.quote(link)}'
