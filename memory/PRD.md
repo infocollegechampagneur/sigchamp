@@ -60,6 +60,10 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
 - **Renommage complet en « SigChamp »** partout (Layout, Login, Install, textes backend, message API racine, en-têtes de courriels, commentaires/scripts PowerShell, titre navigateur). Nouveau slogan de connexion : « Des signatures Outlook cohérentes, pilotées pour le Collège Champagneur. » (Note : `APP_NAME="sigflow"` conservé côté stockage pour ne pas casser les chemins des fichiers déjà téléversés ; invisible pour l'utilisateur.)
 - **Push M365 — remplacement propre** : lors du push direct (`/api/m365/push`), la règle de flux existante (`SigChamp - {email}`) est d'abord **supprimée** (Remove-TransportRule, erreur ignorée si absente) puis recréée, garantissant que l'ancienne signature active est retirée et remplacée par la nouvelle sans doublon ni ancien contenu. Le préfixe de règle est cohérent entre push, remove et scripts (« SigChamp - »).
 
+## Itération 7 — Diagnostic échec push M365 (401) (2026-06)
+- **Bug** : push signature vers M365 échouait sans raison visible (toast « échec », backend renvoyait des octets nuls). **Cause racine** : Exchange Online (InvokeCommand REST) renvoie **401** — le jeton app-only est valide mais l'application Azure n'a **pas** la permission d'exécuter des commandes Exchange (manque `Office 365 Exchange Online → Exchange.ManageAsApp` + rôle « Exchange Administrator »). Problème côté tenant, rendu non diagnosticable par l'app.
+- **Correctifs** : `_exo_error()` décode les réponses Exchange (401/403/autre) en message FR clair et actionnable ; `/api/m365/test` exécute réellement une commande Exchange (`Get-OrganizationConfig`) → le test reflète la vraie capacité de push ; le frontend affiche le motif exact par utilisateur (panneau rouge `m365-push-errors` + toast long). De-dup de la liste d'utilisateurs Graph. Vérifié par testing agent (100% backend + frontend).
+
 ## Backlog / prochaines pistes
 - P1 : envoi automatique de la signature par courriel à chaque employé.
 - P1 : plusieurs modèles/mises en page de signature au choix.

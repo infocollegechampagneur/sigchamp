@@ -1234,15 +1234,20 @@ def _graph_list_users(cfg: dict) -> list:
     tok = _m365_token(cfg, "https://graph.microsoft.com/.default")
     url = "https://graph.microsoft.com/v1.0/users?$select=id,displayName,userPrincipalName,mail,accountEnabled&$top=999"
     out = []
+    seen = set()
     while url:
         r = requests.get(url, headers={"Authorization": f"Bearer {tok}"}, timeout=30)
         if r.status_code != 200:
             raise HTTPException(status_code=502, detail=f"Graph : {r.text[:300]}")
         body = r.json()
         for u in body.get("value", []):
+            em = (u.get("mail") or u.get("userPrincipalName") or "").strip()
+            key = em.lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
             out.append({"id": u["id"], "name": u.get("displayName") or "",
-                        "email": u.get("mail") or u.get("userPrincipalName") or "",
-                        "enabled": u.get("accountEnabled", True)})
+                        "email": em, "enabled": u.get("accountEnabled", True)})
         url = body.get("@odata.nextLink")
     return out
 
@@ -1254,6 +1259,36 @@ def _exo_invoke(cfg: dict, cmdlet: str, params: dict):
                "X-AnchorMailbox": f"APP:SystemMailbox{{bb558c35-97f1-4cb9-8ff7-d53741dc928c}}@{dom}"}
     return requests.post(f"https://outlook.office365.com/adminapi/beta/{dom}/InvokeCommand",
                          headers=headers, json={"CmdletInput": {"CmdletName": cmdlet, "Parameters": params}}, timeout=60)
+
+
+def _exo_error(r):
+    """Transforme une réponse d'erreur Exchange (souvent binaire) en message clair et actionnable."""
+    code = r.status_code
+    base = None
+    try:
+        j = r.json()
+        err = j.get("error")
+        if isinstance(err, dict):
+            base = err.get("message")
+        base = base or j.get("message")
+    except Exception:
+        base = None
+    if not base:
+        try:
+            txt = "".join(ch for ch in r.text if ch.isprintable()).strip()
+            base = txt[:250] if txt else None
+        except Exception:
+            base = None
+    if code == 401:
+        return ("Exchange Online a refusé la requête (401 Non autorisé). Le jeton est valide, mais l'application "
+                "Azure n'a pas le droit d'exécuter des commandes Exchange. Dans le portail Microsoft Entra (Azure AD) : "
+                "1) « API permissions » → ajoutez « Office 365 Exchange Online → Exchange.ManageAsApp » (type Application), "
+                "puis cliquez « Grant admin consent » ; 2) « Roles and administrators » → attribuez à l'application le rôle "
+                "« Exchange Administrator » (ou « Global Administrator »). Patientez quelques minutes puis réessayez.")
+    if code == 403:
+        return ("Exchange Online a refusé la requête (403 Interdit). L'application n'a pas les rôles RBAC nécessaires. "
+                "Attribuez-lui le rôle « Exchange Administrator » dans Microsoft Entra, puis réessayez.")
+    return base or f"Exchange Online a répondu avec le statut {code}."
 
 
 @api_router.get("/m365/config")
@@ -1332,7 +1367,7 @@ async def m365_push(data: M365PushInput, admin: dict = Depends(require_admin)):
                     await db.users.update_one({"_id": emp["_id"]},
                                               {"$set": {"m365_pushed_at": datetime.now(timezone.utc).isoformat()}})
             else:
-                failed.append({"email": email, "error": r.text[:200]})
+                failed.append({"email": email, "error": _exo_error(r)})
         except HTTPException as e:
             failed.append({"email": email, "error": str(e.detail)})
         except Exception as e:
@@ -1360,8 +1395,11 @@ async def m365_test(admin: dict = Depends(require_admin)):
         except Exception as e:
             result["graph_error"] = str(e)
         try:
-            _m365_token(cfg, "https://outlook.office365.com/.default")
-            result["exchange_ok"] = True
+            r = _exo_invoke(cfg, "Get-OrganizationConfig", {})
+            if r.status_code < 300:
+                result["exchange_ok"] = True
+            else:
+                result["exchange_error"] = _exo_error(r)
         except HTTPException as e:
             result["exchange_error"] = str(e.detail)
         except Exception as e:
@@ -1384,14 +1422,15 @@ async def m365_remove(data: M365PushInput, admin: dict = Depends(require_admin))
         rule = f"SigChamp - {email}"
         try:
             r = await asyncio.to_thread(_exo_invoke, cfg, "Remove-TransportRule", {"Identity": rule, "Confirm": False})
-            low = r.text.lower()
-            if r.status_code < 300 or "couldn't be found" in low or "n'existe" in low or "wasn't found" in low:
+            low = "".join(ch for ch in r.text if ch.isprintable()).lower()
+            not_found = any(s in low for s in ["couldn't be found", "wasn't found", "n'existe", "not found", "objectnotfound"])
+            if r.status_code < 300 or not_found:
                 removed.append(email)
                 emp = await db.users.find_one({"email": email})
                 if emp:
                     await db.users.update_one({"_id": emp["_id"]}, {"$set": {"m365_pushed_at": None}})
             else:
-                failed.append({"email": email, "error": r.text[:200]})
+                failed.append({"email": email, "error": _exo_error(r)})
         except HTTPException as e:
             failed.append({"email": email, "error": str(e.detail)})
         except Exception as e:

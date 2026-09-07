@@ -17,6 +17,7 @@ export default function M365Connect() {
   const [removing, setRemoving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [lastErrors, setLastErrors] = useState([]);
   const [q, setQ] = useState("");
 
   useEffect(() => { api.get("/m365/config").then((r) => setCfg((c) => ({ ...c, ...r.data, client_secret: "" }))); }, []);
@@ -49,20 +50,28 @@ export default function M365Connect() {
 
   const push = async () => {
     if (!selectedEmails.length) { toast.error("Sélectionnez au moins un utilisateur."); return; }
-    setPushing(true);
+    setPushing(true); setLastErrors([]);
     try {
       const { data } = await api.post("/m365/push", { emails: selectedEmails, fallback: "Ignore" });
-      toast.success(`${data.applied_count} signature(s) appliquée(s).${data.failed.length ? ` ${data.failed.length} échec(s).` : ""}`);
+      if (data.applied_count) toast.success(`${data.applied_count} signature(s) appliquée(s).`);
+      if (data.failed?.length) {
+        setLastErrors(data.failed);
+        toast.error(`${data.failed.length} échec(s) — ${data.failed[0].error}`, { duration: 15000 });
+      }
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); } finally { setPushing(false); }
   };
 
   const removeRules = async () => {
     if (!selectedEmails.length) { toast.error("Sélectionnez au moins un utilisateur."); return; }
     if (!window.confirm(`Retirer la règle de signature M365 de ${selectedEmails.length} utilisateur(s) ?`)) return;
-    setRemoving(true);
+    setRemoving(true); setLastErrors([]);
     try {
       const { data } = await api.post("/m365/remove", { emails: selectedEmails });
-      toast.success(`${data.removed_count} règle(s) retirée(s).${data.failed.length ? ` ${data.failed.length} échec(s).` : ""}`);
+      if (data.removed_count) toast.success(`${data.removed_count} règle(s) retirée(s).`);
+      if (data.failed?.length) {
+        setLastErrors(data.failed);
+        toast.error(`${data.failed.length} échec(s) — ${data.failed[0].error}`, { duration: 15000 });
+      }
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); } finally { setRemoving(false); }
   };
 
@@ -151,6 +160,20 @@ export default function M365Connect() {
             </Button>
           </div>
         </div>
+
+        {lastErrors.length > 0 && (
+          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4" data-testid="m365-push-errors">
+            <p className="text-sm font-semibold text-red-300 mb-2">Échec sur {lastErrors.length} utilisateur(s)</p>
+            <div className="space-y-2">
+              {lastErrors.map((f, i) => (
+                <div key={i} className="text-xs">
+                  <span className="text-red-200 font-mono">{f.email}</span>
+                  <p className="text-red-300/90 mt-0.5 leading-relaxed">{f.error}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {users.length > 0 && (
           <>
