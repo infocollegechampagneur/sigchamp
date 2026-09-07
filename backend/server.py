@@ -786,13 +786,13 @@ def _email_body(user, signature_html):
   <p style="font-size:14px;"><b>Installation dans Outlook :</b> Fichier → Options → Courrier → Signatures →
   créez une signature, cliquez dans la zone d'édition puis collez (Ctrl+V).</p>
   <p style="font-size:14px;">Mettez à jour vos coordonnées ici : <a href="{link}" style="color:#2563EB;">{link}</a></p>
-  <p style="font-size:12px;color:#9ca3af;">Message envoyé automatiquement par SigFlow Office.</p>
+  <p style="font-size:12px;color:#9ca3af;">Message envoyé automatiquement par SigChamp Office.</p>
 </div>"""
 
 
 @api_router.post("/email/test")
 async def email_test(data: EmailTestInput, admin: dict = Depends(require_admin)):
-    await _send_email(str(data.to), "Test SigFlow — configuration SMTP",
+    await _send_email(str(data.to), "Test SigChamp — configuration SMTP",
                       "<p>Ceci est un courriel de test. Votre configuration SMTP fonctionne. ✅</p>")
     return {"ok": True}
 
@@ -1123,7 +1123,7 @@ async def deploy_exchange_script(_auth: dict = Depends(deploy_auth)):
     users = await db.users.find({"role": "employee"}).to_list(1000)
     block = _ps_signatures_block(users, settings)
     script = f"""# =====================================================================
-# SigFlow Office - Signatures Exchange Online (une regle par employe)
+# SigChamp Office - Signatures Exchange Online (une regle par employe)
 # ---------------------------------------------------------------------
 # Ajoute automatiquement la signature en bas de chaque courriel sortant.
 # Aucun copier-coller cote employe.
@@ -1131,13 +1131,13 @@ async def deploy_exchange_script(_auth: dict = Depends(deploy_auth)):
 # ETAPES (a executer par l'admin Microsoft 365) :
 #   1. Install-Module ExchangeOnlineManagement -Scope CurrentUser
 #   2. Connect-ExchangeOnline -UserPrincipalName admin@votredomaine.com
-#   3. Executez ce script :  .\\sigflow-exchange-signatures.ps1
+#   3. Executez ce script :  .\\sigchamp-exchange-signatures.ps1
 # =====================================================================
 
 {block}
 
 foreach ($email in $signatures.Keys) {{
-    $ruleName = "SigFlow - $email"
+    $ruleName = "SigChamp - $email"
     $html = $signatures[$email]
     if (Get-TransportRule -Identity $ruleName -ErrorAction SilentlyContinue) {{
         Set-TransportRule -Identity $ruleName -From $email `
@@ -1153,7 +1153,7 @@ foreach ($email in $signatures.Keys) {{
 }}
 Write-Host "Termine. $($signatures.Count) signature(s) configuree(s)."
 """
-    return _ps_response(script, "sigflow-exchange-signatures.ps1")
+    return _ps_response(script, "sigchamp-exchange-signatures.ps1")
 
 
 @api_router.get("/deploy/gpo-script")
@@ -1162,7 +1162,7 @@ async def deploy_gpo_script(_auth: dict = Depends(deploy_auth)):
     users = await db.users.find({"role": "employee"}).to_list(1000)
     block = _ps_signatures_block(users, settings)
     script = f"""# =====================================================================
-# SigFlow Office - Deploiement signature Outlook via GPO
+# SigChamp Office - Deploiement signature Outlook via GPO
 # ---------------------------------------------------------------------
 # A deployer en script d'ouverture de session :
 #   Configuration utilisateur > Strategies > Parametres Windows > Scripts
@@ -1195,10 +1195,10 @@ if ($signatures.ContainsKey($email)) {{
     Set-ItemProperty -Path $base -Name "ReplySignature" -Value $sigName
     Write-Host "Signature installee pour $email"
 }} else {{
-    Write-Host "Aucune signature SigFlow trouvee pour $email"
+    Write-Host "Aucune signature SigChamp trouvee pour $email"
 }}
 """
-    return _ps_response(script, "sigflow-outlook-gpo.ps1")
+    return _ps_response(script, "sigchamp-outlook-gpo.ps1")
 
 
 # ---------------------------------------------------------------------------
@@ -1311,12 +1311,18 @@ async def m365_push(data: M365PushInput, admin: dict = Depends(require_admin)):
         user = {**(emp or {}), "email": email, "id": str(emp["_id"]) if emp else None,
                 "name": (emp or {}).get("name") or email.split("@")[0]}
         html = build_signature_html(user, settings)
-        rule = f"SigFlow - {email}"
+        rule = f"SigChamp - {email}"
         params = {"Name": rule, "From": [email], "ApplyHtmlDisclaimerText": html,
                   "ApplyHtmlDisclaimerLocation": "Append", "ApplyHtmlDisclaimerFallbackAction": data.fallback}
         try:
+            # Retirer la signature active existante (le cas échéant) avant de poser la nouvelle,
+            # pour garantir un remplacement propre sans doublon ni ancien contenu.
+            try:
+                await asyncio.to_thread(_exo_invoke, cfg, "Remove-TransportRule", {"Identity": rule, "Confirm": False})
+            except Exception:
+                pass
             r = await asyncio.to_thread(_exo_invoke, cfg, "New-TransportRule", params)
-            if r.status_code >= 400 and ("already exists" in r.text or "existe" in r.text or r.status_code == 400):
+            if r.status_code >= 400 and ("already exists" in r.text or "existe" in r.text):
                 sparams = {"Identity": rule, "From": [email], "ApplyHtmlDisclaimerText": html,
                            "ApplyHtmlDisclaimerLocation": "Append", "ApplyHtmlDisclaimerFallbackAction": data.fallback}
                 r = await asyncio.to_thread(_exo_invoke, cfg, "Set-TransportRule", sparams)
@@ -1375,7 +1381,7 @@ async def m365_remove(data: M365PushInput, admin: dict = Depends(require_admin))
         email = email.strip().lower()
         if not email:
             continue
-        rule = f"SigFlow - {email}"
+        rule = f"SigChamp - {email}"
         try:
             r = await asyncio.to_thread(_exo_invoke, cfg, "Remove-TransportRule", {"Identity": rule, "Confirm": False})
             low = r.text.lower()
@@ -1395,7 +1401,7 @@ async def m365_remove(data: M365PushInput, admin: dict = Depends(require_admin))
 
 @api_router.get("/")
 async def root():
-    return {"message": "SigFlow API"}
+    return {"message": "SigChamp API"}
 
 
 app.include_router(api_router)

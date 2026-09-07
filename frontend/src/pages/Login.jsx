@@ -43,19 +43,19 @@ export default function Login() {
             <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <span className="font-display text-2xl font-extrabold text-white">SigFlow</span>
+            <span className="font-display text-2xl font-extrabold text-white">SigChamp</span>
           </div>
           <div>
             <h1 className="font-display text-5xl font-extrabold text-white leading-[1.05]">
               Des signatures<br />Outlook cohérentes,<br />
-              <span className="text-blue-400">pilotées par la marque.</span>
+              <span className="text-blue-400">pilotées pour le Collège Champagneur.</span>
             </h1>
             <p className="text-slate-400 mt-6 text-lg max-w-md">
               Bannières animées GIF, logos et mentions légales gérés centralement. Chaque employé
               n'ajuste que ses coordonnées.
             </p>
           </div>
-          <div className="text-slate-600 text-sm">© 2026 SigFlow Office</div>
+          <div className="text-slate-600 text-sm">© 2026 SigChamp</div>
         </div>
       </div>
 
@@ -66,7 +66,7 @@ export default function Login() {
             <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <span className="font-display text-2xl font-extrabold text-white">SigFlow</span>
+            <span className="font-display text-2xl font-extrabold text-white">SigChamp</span>
           </div>
           <h2 className="font-display text-3xl font-extrabold text-white">
             {mode === "login" ? "Connexion" : "Créer un compte"}

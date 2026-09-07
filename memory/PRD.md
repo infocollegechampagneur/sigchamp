@@ -56,6 +56,10 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
 - Testé : backend (curl/python) + frontend testing agent (5/5 flux OK). Note mineure : execCommand peut perdre le gras si on continue à taper après une sélection mise en gras (quirk contentEditable, pas une régression).
 - **Adaptation auto thème clair/sombre** : la signature s'adapte au fond. Classes CSS (`sf-name`, `sf-text`, `sf-accent`, `sf-muted`, `sf-disc`, `sf-bar`, `sf-bar-left`, `sf-social`) + bloc `<style>` injecté contenant `@media (prefers-color-scheme:dark)` (clients compatibles : Apple Mail, Outlook.com, iOS/Gmail app) ET une copie scopée `.sf-dark` pour l'aperçu in-app (bouton Clair/Sombre). En sombre : texte éclairci, et l'accent (barre verticale + libellés) est éclairci automatiquement quand la couleur d'accent est trop foncée (`darkAccentFor`/`_dark_accent_for`, lum < 0.55). Vérifié visuellement en clair et en sombre.
 
+## Itération 6 — Renommage SigChamp & remplacement propre M365 (2026-06)
+- **Renommage complet en « SigChamp »** partout (Layout, Login, Install, textes backend, message API racine, en-têtes de courriels, commentaires/scripts PowerShell, titre navigateur). Nouveau slogan de connexion : « Des signatures Outlook cohérentes, pilotées pour le Collège Champagneur. » (Note : `APP_NAME="sigflow"` conservé côté stockage pour ne pas casser les chemins des fichiers déjà téléversés ; invisible pour l'utilisateur.)
+- **Push M365 — remplacement propre** : lors du push direct (`/api/m365/push`), la règle de flux existante (`SigChamp - {email}`) est d'abord **supprimée** (Remove-TransportRule, erreur ignorée si absente) puis recréée, garantissant que l'ancienne signature active est retirée et remplacée par la nouvelle sans doublon ni ancien contenu. Le préfixe de règle est cohérent entre push, remove et scripts (« SigChamp - »).
+
 ## Backlog / prochaines pistes
 - P1 : envoi automatique de la signature par courriel à chaque employé.
 - P1 : plusieurs modèles/mises en page de signature au choix.

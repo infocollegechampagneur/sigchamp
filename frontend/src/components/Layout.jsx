@@ -29,7 +29,7 @@ export default function Layout({ children }) {
           <div className="h-9 w-9 rounded-xl bg-blue-600 flex items-center justify-center">
             <Sparkles className="h-5 w-5 text-white" />
           </div>
-          <span className="font-display text-xl font-extrabold text-white">SigFlow</span>
+          <span className="font-display text-xl font-extrabold text-white">SigChamp</span>
         </div>
 
         <nav className="flex-1 px-3 py-5 space-y-1">
@@ -76,7 +76,7 @@ export default function Layout({ children }) {
           <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center">
             <Sparkles className="h-4 w-4 text-white" />
           </div>
-          <span className="font-display text-lg font-extrabold text-white">SigFlow</span>
+          <span className="font-display text-lg font-extrabold text-white">SigChamp</span>
         </div>
         <button data-testid="button-logout-mobile" onClick={() => { logout(); navigate("/login"); }} className="text-slate-400">
           <LogOut className="h-5 w-5" />
