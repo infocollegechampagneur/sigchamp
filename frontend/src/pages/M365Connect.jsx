@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Cloud, Save, Loader2, Users, Send, CheckCircle2, Search, ShieldCheck } from "lucide-react";
+import { Cloud, Save, Loader2, Users, Send, CheckCircle2, Search, ShieldCheck, PlugZap, Trash2, XCircle } from "lucide-react";
 
 export default function M365Connect() {
   const [cfg, setCfg] = useState({ tenant_id: "", client_id: "", client_secret: "", tenant_domain: "", has_secret: false, connected: false });
@@ -14,6 +14,9 @@ export default function M365Connect() {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState({});
   const [pushing, setPushing] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
   const [q, setQ] = useState("");
 
   useEffect(() => { api.get("/m365/config").then((r) => setCfg((c) => ({ ...c, ...r.data, client_secret: "" }))); }, []);
@@ -53,6 +56,27 @@ export default function M365Connect() {
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); } finally { setPushing(false); }
   };
 
+  const removeRules = async () => {
+    if (!selectedEmails.length) { toast.error("Sélectionnez au moins un utilisateur."); return; }
+    if (!window.confirm(`Retirer la règle de signature M365 de ${selectedEmails.length} utilisateur(s) ?`)) return;
+    setRemoving(true);
+    try {
+      const { data } = await api.post("/m365/remove", { emails: selectedEmails });
+      toast.success(`${data.removed_count} règle(s) retirée(s).${data.failed.length ? ` ${data.failed.length} échec(s).` : ""}`);
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); } finally { setRemoving(false); }
+  };
+
+  const testConn = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const { data } = await api.get("/m365/test");
+      setTestResult(data);
+      if (data.graph_ok && data.exchange_ok) toast.success("Connexion Microsoft 365 valide ✅");
+      else toast.error("Connexion partielle ou invalide — voir le détail.");
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); } finally { setTesting(false); }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-5 lg:px-8 py-8">
       <div className="mb-8">
@@ -78,9 +102,28 @@ export default function M365Connect() {
           <div><Label className="text-slate-300">Secret client {cfg.has_secret && <span className="text-slate-500">(laisser vide pour conserver)</span>}</Label>
             <Input data-testid="input-m365-secret" type="password" value={cfg.client_secret} onChange={set("client_secret")} placeholder="••••••••" className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" /></div>
         </div>
-        <Button onClick={save} disabled={saving} data-testid="button-save-m365" className="mt-5 h-11 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6">
-          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Enregistrer la connexion
-        </Button>
+        <div className="flex flex-wrap gap-3 mt-5">
+          <Button onClick={save} disabled={saving} data-testid="button-save-m365" className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6">
+            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} Enregistrer la connexion
+          </Button>
+          <Button onClick={testConn} disabled={testing} data-testid="button-test-m365" variant="outline" className="h-11 border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-700 hover:text-white px-6">
+            {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PlugZap className="h-4 w-4 mr-2" />} Tester la connexion
+          </Button>
+        </div>
+        {testResult && (
+          <div className="mt-4 grid sm:grid-cols-2 gap-2" data-testid="m365-test-result">
+            {[{ label: "Microsoft Graph (lister)", ok: testResult.graph_ok, err: testResult.graph_error },
+              { label: "Exchange (pousser)", ok: testResult.exchange_ok, err: testResult.exchange_error }].map((t) => (
+              <div key={t.label} className={`flex items-start gap-2 text-sm rounded-xl p-3 border ${t.ok ? "border-emerald-500/30 bg-emerald-500/10" : "border-red-500/30 bg-red-500/10"}`}>
+                {t.ok ? <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" /> : <XCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />}
+                <div className="min-w-0">
+                  <p className={t.ok ? "text-emerald-300" : "text-red-300"}>{t.label} : {t.ok ? "OK" : "échec"}</p>
+                  {!t.ok && t.err && <p className="text-xs text-slate-400 break-words">{t.err}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="mt-4 flex gap-3 text-xs text-slate-400 bg-slate-800/40 border border-slate-700/60 rounded-xl p-3">
           <ShieldCheck className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
           <div>
@@ -99,6 +142,9 @@ export default function M365Connect() {
           <div className="flex gap-2">
             <Button onClick={loadUsers} disabled={loading} data-testid="button-load-m365-users" variant="outline" className="border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-700 hover:text-white">
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Users className="h-4 w-4 mr-2" />} Charger les utilisateurs
+            </Button>
+            <Button onClick={removeRules} disabled={removing || !selectedEmails.length} data-testid="button-remove-m365" variant="outline" className="border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20">
+              {removing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />} Retirer ({selectedEmails.length})
             </Button>
             <Button onClick={push} disabled={pushing || !selectedEmails.length} data-testid="button-push-m365" className="bg-blue-600 hover:bg-blue-500 text-white font-semibold">
               {pushing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />} Pousser ({selectedEmails.length})

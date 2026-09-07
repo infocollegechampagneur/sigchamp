@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
 import { SignaturePreview } from "@/components/SignaturePreview";
-import { DEFAULT_DISCLAIMER } from "@/lib/signature";
+import { DEFAULT_DISCLAIMER, buildSignatureHtml } from "@/lib/signature";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -129,6 +129,27 @@ export default function BrandAssets() {
                 <option value="modern">Moderne — bloc à bordure, coordonnées en ligne</option>
               </select>
               <p className="text-xs text-slate-500 mt-1.5">Chaque département peut avoir sa propre mise en page dans « Bannières &amp; GIF ».</p>
+
+              {/* Aperçu comparatif Classique vs Moderne */}
+              <div className="grid sm:grid-cols-2 gap-3 mt-4" data-testid="layout-compare">
+                {[{ id: "classic", label: "Classique" }, { id: "modern", label: "Moderne" }].map((opt) => {
+                  const active = (s.signature_layout || "classic") === opt.id;
+                  const previewHtml = buildSignatureHtml(SAMPLE_EMPLOYEE, { ...s, signature_layout: opt.id, department_banners: [] });
+                  return (
+                    <div key={opt.id} className={`rounded-xl border overflow-hidden ${active ? "border-blue-500 ring-1 ring-blue-500/40" : "border-slate-700"}`} data-testid={`layout-card-${opt.id}`}>
+                      <div className={`flex items-center justify-between px-3 py-2 text-xs font-semibold ${active ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>
+                        <span>{opt.label}</span>
+                        {active ? <span className="text-[10px]">Sélectionné</span> : (
+                          <button onClick={() => setS((p) => ({ ...p, signature_layout: opt.id }))} data-testid={`choose-layout-${opt.id}`} className="text-[10px] underline hover:no-underline">Choisir</button>
+                        )}
+                      </div>
+                      <div className="bg-white p-2 overflow-hidden" style={{ height: 150 }}>
+                        <div style={{ zoom: 0.42 }} dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <div className="mt-4">
               <Label className="text-slate-300">Adresse de l'entreprise</Label>

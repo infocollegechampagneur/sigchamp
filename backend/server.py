@@ -1253,6 +1253,65 @@ async def m365_push(data: M365PushInput, admin: dict = Depends(require_admin)):
     return {"applied": applied, "failed": failed, "applied_count": len(applied)}
 
 
+@api_router.get("/m365/test")
+async def m365_test(admin: dict = Depends(require_admin)):
+    cfg = await _m365_cfg()
+    if not cfg.get("client_secret") or not cfg.get("client_id") or not cfg.get("tenant_id"):
+        raise HTTPException(status_code=400, detail="Renseignez d'abord Tenant ID, Client ID et Secret.")
+
+    def _run():
+        result = {"graph_ok": False, "graph_error": None, "exchange_ok": False, "exchange_error": None}
+        try:
+            tok = _m365_token(cfg, "https://graph.microsoft.com/.default")
+            r = requests.get("https://graph.microsoft.com/v1.0/users?$top=1",
+                             headers={"Authorization": f"Bearer {tok}"}, timeout=20)
+            result["graph_ok"] = r.status_code == 200
+            if r.status_code != 200:
+                result["graph_error"] = r.text[:200]
+        except HTTPException as e:
+            result["graph_error"] = str(e.detail)
+        except Exception as e:
+            result["graph_error"] = str(e)
+        try:
+            _m365_token(cfg, "https://outlook.office365.com/.default")
+            result["exchange_ok"] = True
+        except HTTPException as e:
+            result["exchange_error"] = str(e.detail)
+        except Exception as e:
+            result["exchange_error"] = str(e)
+        return result
+
+    return await asyncio.to_thread(_run)
+
+
+@api_router.post("/m365/remove")
+async def m365_remove(data: M365PushInput, admin: dict = Depends(require_admin)):
+    cfg = await _m365_cfg()
+    if not cfg.get("client_secret") or not cfg.get("tenant_domain"):
+        raise HTTPException(status_code=400, detail="Microsoft 365 non configuré.")
+    removed, failed = [], []
+    for email in data.emails:
+        email = email.strip().lower()
+        if not email:
+            continue
+        rule = f"SigFlow - {email}"
+        try:
+            r = await asyncio.to_thread(_exo_invoke, cfg, "Remove-TransportRule", {"Identity": rule, "Confirm": False})
+            low = r.text.lower()
+            if r.status_code < 300 or "couldn't be found" in low or "n'existe" in low or "wasn't found" in low:
+                removed.append(email)
+                emp = await db.users.find_one({"email": email})
+                if emp:
+                    await db.users.update_one({"_id": emp["_id"]}, {"$set": {"m365_pushed_at": None}})
+            else:
+                failed.append({"email": email, "error": r.text[:200]})
+        except HTTPException as e:
+            failed.append({"email": email, "error": str(e.detail)})
+        except Exception as e:
+            failed.append({"email": email, "error": str(e)})
+    return {"removed": removed, "failed": failed, "removed_count": len(removed)}
+
+
 @api_router.get("/")
 async def root():
     return {"message": "SigFlow API"}
