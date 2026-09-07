@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only validation of iteration 4 features (TikTok social, Logos/Noms toggle, rich-text disclaimer, avatar upload/remove/size slider). All flows pass. Login OK (informatique@champagneur.qc.ca). /app/brand: social-style-toggle present with 'Logos' (social-style-icons) and 'Noms' (social-style-names). Filled input-social-linkedin, input-social-facebook, input-social-tiktok; in Logos mode preview renders 15 icon <img> from /api/social-icons/*.png (3 previews x 5 socials incl. TikTok icon visible), in Noms mode zero icons and text labels 'LinkedIn/Facebook/TikTok' render. Disclaimer rich text: typed content, applied italic to selection, inserted line break, saved and reloaded — HTML persisted exactly ('Ceci est confidentiel <i>italique<br>Ligne 2</i>'), and Logos mode persisted after reload. /app/signature: with existing avatar, button-remove-avatar + avatar-size-control (slider-avatar-width) are visible; uploaded a new PNG via input-upload-avatar and 'Photo mise à jour' toast fired; moved slider (label went to 288px) and preview updated (avatar img rendered next to accent bar with company logo above employee name in modern layout); clicking 'Retirer' removed the avatar/slider without wiping name/title/phone_ext fields (name='Simon Lynch' preserved). Preview correctly shows photo LEFT of the vertical accent bar and company logo above the name (see mysig screenshot).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "BrandAssets - RichTextEditor", "issues": ["Applying Bold via Ctrl+A + rte-bold on a text that was then extended by typing at End loses the bold tag in emitted HTML because contentEditable de-activates the format when the current selection collapses at the end of the bold range. Italic and linebreak work reliably. Consider persisting active-format state and re-applying on continued typing, or convert to a proper Slate/Tiptap editor for MVP+."]}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_4.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "RichTextEditor uses deprecated document.execCommand which is legacy but still works in Chromium/Outlook; acceptable for MVP. Consider migration for future browsers.",
+    "buildSignatureHtml renders social icons via absolute BACKEND URL — good for email clients. Ensure the /api/social-icons/{name}.png endpoint has long-lived Cache-Control to keep images loading in Outlook.",
+    "signature.js line 76: default social_style is 'icons' when settings has no value — matches UI default; consistent.",
+    "MySignature avatar_url check on 127-141 correctly hides slider+Retirer when no avatar; behavior verified.",
+    "sanitize disclaimer server-side via bleach (per E1 note) — good; frontend renders raw HTML via dangerouslySetInnerHTML in buildSignatureHtml which is fine because backend sanitized it."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% (5/5 flows)"},
+  "test_credentials": "admin: informatique@champagneur.qc.ca / sig3713+ — OK",
+  "seed_data_creation": "None (settings mutated on admin account: social.linkedin/facebook/tiktok, disclaimer text). Left as-is per test scope.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Admin account already has avatar_url set — remove-btn and slider are visible even before upload. Preview area contains 3 signature renderings (desktop preview + comparative Classique/Moderne cards on Brand page), so any preview img count is a multiple of 3. Social icons served from ${REACT_APP_BACKEND_URL}/api/social-icons/{key}.png (linkedin/twitter/facebook/instagram/youtube/tiktok). Disclaimer field is contentEditable (data-testid input-disclaimer-text); to test formatting use page.keyboard + rte-bold/rte-italic/rte-underline/rte-linebreak. Ctrl+A + Bold then continuing typing may drop bold — this is a known execCommand quirk, not a regression."
+}

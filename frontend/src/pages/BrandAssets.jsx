@@ -3,13 +3,13 @@ import { toast } from "sonner";
 import { api } from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
 import { SignaturePreview } from "@/components/SignaturePreview";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { DEFAULT_DISCLAIMER, buildSignatureHtml } from "@/lib/signature";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Upload, Save, Loader2, Linkedin, Twitter, Facebook, Instagram, Youtube } from "lucide-react";
+import { Upload, Save, Loader2, Linkedin, Twitter, Facebook, Instagram, Youtube, Music2 } from "lucide-react";
 
 const SAMPLE_EMPLOYEE = {
   name: "Sophie Roy", title: "Responsable Marketing", department: "Marketing",
@@ -21,6 +21,7 @@ export default function BrandAssets() {
   const [s, setS] = useState(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [rteRev, setRteRev] = useState(0);
 
   useEffect(() => { api.get("/settings").then((r) => setS(r.data)); }, []);
 
@@ -65,6 +66,7 @@ export default function BrandAssets() {
     { key: "facebook", icon: Facebook, ph: "facebook.com/…" },
     { key: "instagram", icon: Instagram, ph: "instagram.com/…" },
     { key: "youtube", icon: Youtube, ph: "youtube.com/@…" },
+    { key: "tiktok", icon: Music2, ph: "tiktok.com/@…" },
   ];
 
   return (
@@ -170,7 +172,25 @@ export default function BrandAssets() {
 
           {/* Social */}
           <div className="rounded-2xl bg-[#111827] border border-slate-800 p-6">
-            <h3 className="font-semibold text-white mb-5">Réseaux sociaux</h3>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-semibold text-white">Réseaux sociaux</h3>
+              <div className="flex items-center gap-1 bg-slate-800/60 border border-slate-700 rounded-lg p-0.5" data-testid="social-style-toggle">
+                <button
+                  onClick={() => setS((p) => ({ ...p, social_style: "icons" }))}
+                  data-testid="social-style-icons"
+                  className={`text-xs px-3 py-1.5 rounded-md transition-colors ${(s.social_style || "icons") === "icons" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"}`}
+                >
+                  Logos
+                </button>
+                <button
+                  onClick={() => setS((p) => ({ ...p, social_style: "names" }))}
+                  data-testid="social-style-names"
+                  className={`text-xs px-3 py-1.5 rounded-md transition-colors ${(s.social_style || "icons") === "names" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"}`}
+                >
+                  Noms
+                </button>
+              </div>
+            </div>
             <div className="space-y-3">
               {socials.map(({ key, icon: Icon, ph }) => (
                 <div key={key} className="flex items-center gap-3">
@@ -192,9 +212,15 @@ export default function BrandAssets() {
             <div className="mt-4">
               <div className="flex items-center justify-between">
                 <Label className="text-slate-300">Mention de confidentialité</Label>
-                <button onClick={() => setS((p) => ({ ...p, disclaimer: DEFAULT_DISCLAIMER }))} className="text-xs text-blue-400 hover:text-blue-300">Insérer le modèle</button>
+                <button onClick={() => { setS((p) => ({ ...p, disclaimer: DEFAULT_DISCLAIMER })); setRteRev((r) => r + 1); }} className="text-xs text-blue-400 hover:text-blue-300">Insérer le modèle</button>
               </div>
-              <Textarea data-testid="input-disclaimer-text" value={s.disclaimer} onChange={set("disclaimer")} rows={4} className="mt-1.5 bg-slate-800/60 border-slate-700 text-white resize-none" />
+              <RichTextEditor
+                value={s.disclaimer}
+                revision={rteRev}
+                onChange={(html) => setS((p) => ({ ...p, disclaimer: html }))}
+                testId="input-disclaimer-text"
+              />
+              <p className="text-xs text-slate-500 mt-1.5">Utilisez <b>gras</b>, <i>italique</i>, souligné et sauts de ligne pour la mise en forme.</p>
             </div>
           </div>
         </div>

@@ -20,6 +20,7 @@ const SOCIAL_META = {
   facebook: { label: "Facebook", color: "#1877F2" },
   instagram: { label: "Instagram", color: "#E1306C" },
   youtube: { label: "YouTube", color: "#FF0000" },
+  tiktok: { label: "TikTok", color: "#111827" },
 };
 
 export function resolveBanner(user = {}, s = {}) {
@@ -48,12 +49,14 @@ export function buildSignatureHtml(user = {}, s = {}) {
   const company = esc(s.company_name || "");
   const website = s.website || "";
   const address = esc(s.address || "");
-  const disclaimer = esc(s.disclaimer || "");
+  const disclaimer = s.disclaimer || "";
   const avatar = user.avatar_url || "";
   const companyLogo = s.logo_url || "";
   const leftImg = avatar || companyLogo;
   const logoInIdentity = !!(avatar && companyLogo);
   const topLogoW = Math.min(logoW + 30, 140);
+  const avatarW = Number(user.avatar_width) || logoW;
+  const leftW = avatar ? avatarW : logoW;
   const banner = resolveBanner(user, s);
   const gifUrl = banner.gif_url || "";
   const bannerLink = normUrl(banner.banner_link);
@@ -70,11 +73,18 @@ export function buildSignatureHtml(user = {}, s = {}) {
 
   // Social links row
   const social = s.social || {};
+  const iconsMode = (s.social_style || "icons") === "icons";
+  const socialSep = iconsMode ? "&nbsp;&nbsp;" : ' <span style="color:#d1d5db;">|</span> ';
   const socialLinks = Object.keys(SOCIAL_META)
     .filter((k) => social[k])
     .map((k) => {
       const meta = SOCIAL_META[k];
-      return `<a href="${esc(normUrl(social[k]))}" style="color:${meta.color};text-decoration:none;font-weight:600;font-size:12px;" target="_blank">${meta.label}</a>`;
+      const href = esc(normUrl(social[k]));
+      if (iconsMode) {
+        const icon = `${BACKEND}/api/social-icons/${k}.png`;
+        return `<a href="${href}" style="text-decoration:none;display:inline-block;" target="_blank"><img src="${icon}" width="24" height="24" style="display:inline-block;border:0;width:24px;height:24px;vertical-align:middle;border-radius:5px;" alt="${meta.label}" /></a>`;
+      }
+      return `<a href="${href}" style="color:${meta.color};text-decoration:none;font-weight:600;font-size:12px;" target="_blank">${meta.label}</a>`;
     });
 
   const contactLines = [];
@@ -91,7 +101,7 @@ export function buildSignatureHtml(user = {}, s = {}) {
 
   const logoCell = leftImg
     ? `<td style="vertical-align:top;padding-right:18px;border-right:3px solid ${color};">
-         <img src="${esc(leftImg)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;" alt="${company}" />
+         <img src="${esc(leftImg)}" width="${leftW}" style="display:block;width:${leftW}px;border-radius:6px;" alt="${company}" />
        </td>`
     : "";
 
@@ -107,7 +117,7 @@ export function buildSignatureHtml(user = {}, s = {}) {
         ${titleLine ? `<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:${color};padding-bottom:2px;">${titleLine}</td></tr>` : ""}
         ${company ? `<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-bottom:6px;">${company}</td></tr>` : ""}
         ${contactLines.join("")}
-        ${socialLinks.length ? `<tr><td style="padding-top:6px;font-family:Arial,Helvetica,sans-serif;">${socialLinks.join(' <span style="color:#d1d5db;">|</span> ')}</td></tr>` : ""}
+        ${socialLinks.length ? `<tr><td style="padding-top:6px;font-family:Arial,Helvetica,sans-serif;">${socialLinks.join(socialSep)}</td></tr>` : ""}
       </table>
     </td>`;
 
@@ -119,7 +129,7 @@ export function buildSignatureHtml(user = {}, s = {}) {
     if (website) parts.push(`<a href="${esc(normUrl(website))}" style="color:${textColor};text-decoration:none;">${esc(website.replace(/^https?:\/\//i, ""))}</a>`);
     const contactInline = parts.join(' &nbsp;<span style="color:#d1d5db;">·</span>&nbsp; ');
     const photoCell = avatar
-      ? `<td style="vertical-align:top;padding-right:16px;"><img src="${esc(avatar)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;" alt="Photo" /></td>`
+      ? `<td style="vertical-align:top;padding-right:16px;"><img src="${esc(avatar)}" width="${avatarW}" style="display:block;width:${avatarW}px;border-radius:6px;" alt="Photo" /></td>`
       : "";
     const contentLogo =
       (logoInIdentity ? `<img src="${esc(companyLogo)}" width="${topLogoW}" style="display:block;width:${topLogoW}px;max-width:100%;border-radius:4px;margin-bottom:8px;" alt="${company}" />` : "") +
@@ -133,7 +143,7 @@ export function buildSignatureHtml(user = {}, s = {}) {
       (company ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-top:1px;">${company}</div>` : "") +
       (contactInline ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#374151;padding-top:6px;">${contactInline}</div>` : "") +
       (address ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${mutedColor};padding-top:2px;">${address}</div>` : "") +
-      (socialLinks.length ? `<div style="padding-top:6px;">${socialLinks.join(' <span style="color:#d1d5db;">|</span> ')}</div>` : "") +
+      (socialLinks.length ? `<div style="padding-top:6px;">${socialLinks.join(socialSep)}</div>` : "") +
       `</td>`;
     rows.push(`<tr>${modern}</tr>`);
   } else {

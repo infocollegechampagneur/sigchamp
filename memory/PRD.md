@@ -46,9 +46,14 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
 - **Guide `SELF_HOSTING_M365_GUIDE.md`** (FR) : indépendance Emergent (stockage local), hébergement Windows/Linux/Render, **SMTP2Go** (`mail.smtp2go.com:587`), régénération auto (Task Scheduler/cron + connexion Exchange non-interactive cert-based), et déploiement M365 pas-à-pas (Exchange transport rules + GPO). Rappel : l'employé ne modifie que nom/poste/courriel/poste téléphonique.
 - `.env.example`, `docker-compose.yml` (volume storage persistant + `DEPLOY_API_TOKEN`) mis à jour.
 
-## Itération 5 — Photo employé + logo & bouton retrait (2026-06)
-- **Photo + logo ensemble** : quand un employé ajoute sa photo, la signature affiche la photo à gauche (avec la barre verticale d'accent) ET le logo de l'entreprise au-dessus du nom (dans la cellule identité). Sans photo, comportement inchangé (logo à gauche). Appliqué aux deux générateurs : `frontend/src/lib/signature.js` (classic + modern) et `backend/server.py build_signature_html`.
-- **Bouton « Retirer »** : dans « Ma signature », bouton pour enlever la photo (revient au logo seul), sans toucher au reste des informations. Texte d'aide mis à jour : « Votre photo s'affichera avec le logo de l'entreprise. »
+## Itération 5 — Photo employé + logo, retrait, taille, logos réseaux & mise en forme (2026-06)
+- **Photo + logo ensemble** : quand un employé ajoute sa photo, la signature affiche la photo à gauche (avec la barre verticale d'accent) ET le logo de l'entreprise au-dessus du nom. Sans photo, comportement inchangé. Mode Moderne : photo placée à gauche de la barre verticale. Appliqué aux 2 générateurs (`frontend/src/lib/signature.js` classic+modern et `backend/server.py build_signature_html`).
+- **Bouton « Retirer »** (page « Ma signature ») : enlève la photo sans toucher au reste des infos.
+- **Taille de photo ajustable** : champ `avatar_width` par employé + curseur « Taille de la photo » (60–280px) dans « Ma signature » pour aligner la photo sur la hauteur de la barre.
+- **TikTok** ajouté aux réseaux sociaux (modèle `SocialLinks`, `_SOCIAL`, `SOCIAL_META`, champ dans « Charte graphique »).
+- **Logos vs Noms des réseaux** : bascule `social_style` ("icons"/"names", défaut icons) dans « Charte graphique ». En mode logos, la signature affiche des icônes PNG (24px) servies par le backend depuis `/api/social-icons/{réseau}.png` (icônes empaquetées dans `backend/assets/social/`, indépendantes = compatibles Outlook/self-hosting).
+- **Mention légale enrichie** : éditeur de texte riche (`components/RichTextEditor.jsx`, contentEditable) avec gras / italique / souligné / saut de ligne. Le disclaimer est stocké en HTML, **assaini côté serveur avec `bleach`** (balises autorisées : b, strong, i, em, u, br, p, div, span ; scripts/styles retirés) et rendu tel quel dans la signature.
+- Testé : backend (curl/python) + frontend testing agent (5/5 flux OK). Note mineure : execCommand peut perdre le gras si on continue à taper après une sélection mise en gras (quirk contentEditable, pas une régression).
 
 ## Backlog / prochaines pistes
 - P1 : envoi automatique de la signature par courriel à chaque employé.

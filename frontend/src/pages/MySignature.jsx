@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Slider } from "@/components/ui/slider";
 import { Upload, Save, Loader2, Trash2 } from "lucide-react";
 
 export default function MySignature() {
   const { user, refreshUser } = useAuth();
   const [settings, setSettings] = useState(null);
-  const [form, setForm] = useState({ name: "", title: "", phone_ext: "", direct_line: "", department: "", avatar_url: "" });
+  const [form, setForm] = useState({ name: "", title: "", phone_ext: "", direct_line: "", department: "", avatar_url: "", avatar_width: 0 });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -25,6 +26,7 @@ export default function MySignature() {
       setForm({
         name: user.name || "", title: user.title || "", phone_ext: user.phone_ext || "",
         direct_line: user.direct_line || "", department: user.department || "", avatar_url: user.avatar_url || "",
+        avatar_width: user.avatar_width || 0,
       });
   }, [user]);
 
@@ -121,6 +123,22 @@ export default function MySignature() {
                 <p className="text-xs text-slate-500 mt-1.5">Votre photo s'affichera avec le logo de l'entreprise.</p>
               </div>
             </div>
+
+            {form.avatar_url && (
+              <div className="mb-6" data-testid="avatar-size-control">
+                <div className="flex justify-between">
+                  <Label className="text-slate-300">Taille de la photo</Label>
+                  <span className="text-xs font-mono text-blue-400">{form.avatar_width || settings?.logo_width || 120}px</span>
+                </div>
+                <Slider
+                  value={[form.avatar_width || settings?.logo_width || 120]}
+                  min={60} max={280} step={4}
+                  onValueChange={(v) => setForm((f) => ({ ...f, avatar_width: v[0] }))}
+                  className="mt-3" data-testid="slider-avatar-width"
+                />
+                <p className="text-xs text-slate-500 mt-1.5">Ajustez pour aligner la photo sur la hauteur de la barre verticale.</p>
+              </div>
+            )}
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">

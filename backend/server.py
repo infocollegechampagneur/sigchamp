@@ -22,7 +22,7 @@ import requests
 import aiosmtplib
 from bson import ObjectId
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Request, Response, Query
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -187,6 +187,7 @@ class SocialLinks(BaseModel):
     facebook: str = ""
     instagram: str = ""
     youtube: str = ""
+    tiktok: str = ""
 
 
 class DeptBanner(BaseModel):
@@ -213,6 +214,7 @@ class CompanySettings(BaseModel):
     logo_width: int = 86
     banner_width: int = 600
     social: SocialLinks = Field(default_factory=SocialLinks)
+    social_style: str = "icons"
     gif_images: List[str] = Field(default_factory=list)
     gif_interval_ms: int = 2500
     gif_url: str = ""
@@ -278,6 +280,7 @@ class ProfileUpdate(BaseModel):
     direct_line: Optional[str] = None
     department: Optional[str] = None
     avatar_url: Optional[str] = None
+    avatar_width: Optional[int] = None
 
 
 class GifGenerateInput(BaseModel):
@@ -306,6 +309,7 @@ def user_to_public(u: dict) -> dict:
         "direct_line": u.get("direct_line", ""),
         "department": u.get("department", ""),
         "avatar_url": u.get("avatar_url", ""),
+        "avatar_width": int(u.get("avatar_width") or 0),
         "signature_installed": bool(u.get("signature_installed", False)),
         "installed_at": u.get("installed_at"),
         "last_sent_at": u.get("last_sent_at"),
@@ -379,6 +383,7 @@ async def get_settings(user: dict = Depends(get_current_user)):
 @api_router.put("/settings")
 async def update_settings(data: CompanySettings, admin: dict = Depends(require_admin)):
     payload = data.model_dump()
+    payload["disclaimer"] = _clean_html(payload.get("disclaimer") or "")
     await db.settings.update_one({"key": "global"}, {"$set": payload}, upsert=True)
     return await load_settings()
 
@@ -408,6 +413,21 @@ async def upload_avatar(file: UploadFile = File(...), user: dict = Depends(get_c
     url = f"{BACKEND_PUBLIC_URL}/api/files/{stored}"
     await db.users.update_one({"_id": ObjectId(user["id"])}, {"$set": {"avatar_url": url}})
     return {"path": stored, "url": url}
+
+
+ASSETS_DIR = Path(__file__).parent / "assets"
+
+
+@app.get("/api/social-icons/{name}")
+async def social_icon(name: str):
+    safe = name.replace("/", "").replace("..", "")
+    fp = ASSETS_DIR / "social" / safe
+    if not fp.suffix:
+        fp = fp.with_suffix(".png")
+    if not fp.exists():
+        raise HTTPException(status_code=404, detail="Icône introuvable")
+    return FileResponse(str(fp), media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/api/files/{path:path}")
@@ -492,6 +512,15 @@ def _esc(v):
             .replace(">", "&gt;").replace('"', "&quot;"))
 
 
+_ALLOWED_HTML_TAGS = ["b", "strong", "i", "em", "u", "br", "p", "div", "span"]
+
+
+def _clean_html(v):
+    """Sanitize admin-authored rich text (disclaimer) to a safe inline tag whitelist."""
+    import bleach
+    return bleach.clean(str(v or ""), tags=_ALLOWED_HTML_TAGS, attributes={}, strip=True)
+
+
 def _norm_url(u):
     t = str(u or "").strip()
     if not t:
@@ -501,7 +530,7 @@ def _norm_url(u):
 
 _SOCIAL = {"linkedin": ("LinkedIn", "#0A66C2"), "twitter": ("X", "#111827"),
            "facebook": ("Facebook", "#1877F2"), "instagram": ("Instagram", "#E1306C"),
-           "youtube": ("YouTube", "#FF0000")}
+           "youtube": ("YouTube", "#FF0000"), "tiktok": ("TikTok", "#111827")}
 
 
 def _resolve_banner(user, s):
@@ -530,12 +559,14 @@ def build_signature_html(user, s):
     company = _esc(s.get("company_name") or "")
     website = s.get("website") or ""
     address = _esc(s.get("address") or "")
-    disclaimer = _esc(s.get("disclaimer") or "")
+    disclaimer = _clean_html(s.get("disclaimer") or "")
     avatar = user.get("avatar_url") or ""
     company_logo = s.get("logo_url") or ""
     left_img = avatar or company_logo
     logo_in_identity = bool(avatar and company_logo)
     top_logo_w = min(logo_w + 30, 140)
+    avatar_w = int(user.get("avatar_width") or 0) or logo_w
+    left_w = avatar_w if avatar else logo_w
 
     title_line = " · ".join([x for x in [title, dept] if x])
     phone_parts = [p for p in [phone_main, (f"poste {ext}" if ext else "")] if p]
@@ -554,15 +585,21 @@ def build_signature_html(user, s):
         lines.append(f'<tr><td style="padding:1px 0;font-size:12px;color:#6b7280;">{address}</td></tr>')
 
     social = s.get("social", {}) or {}
+    icons_mode = (s.get("social_style") or "icons") == "icons"
     social_links = []
     for k, (label, c) in _SOCIAL.items():
         if social.get(k):
-            social_links.append(f'<a href="{_esc(_norm_url(social[k]))}" style="color:{c};text-decoration:none;font-weight:600;font-size:12px;">{label}</a>')
-    sep = ' <span style="color:#d1d5db;">|</span> '
+            href = _esc(_norm_url(social[k]))
+            if icons_mode:
+                icon = f"{BACKEND_PUBLIC_URL}/api/social-icons/{k}.png"
+                social_links.append(f'<a href="{href}" style="text-decoration:none;display:inline-block;" target="_blank"><img src="{icon}" width="24" height="24" style="display:inline-block;border:0;width:24px;height:24px;vertical-align:middle;border-radius:5px;" alt="{label}" /></a>')
+            else:
+                social_links.append(f'<a href="{href}" style="color:{c};text-decoration:none;font-weight:600;font-size:12px;">{label}</a>')
+    sep = "&nbsp;&nbsp;" if icons_mode else ' <span style="color:#d1d5db;">|</span> '
     social_row = f'<tr><td style="padding-top:6px;font-family:Arial,Helvetica,sans-serif;">{sep.join(social_links)}</td></tr>' if social_links else ""
 
     logo_cell = (f'<td style="vertical-align:top;padding-right:18px;border-right:3px solid {color};">'
-                 f'<img src="{_esc(left_img)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;" alt="{company}" /></td>') if left_img else ""
+                 f'<img src="{_esc(left_img)}" width="{left_w}" style="display:block;width:{left_w}px;border-radius:6px;" alt="{company}" /></td>') if left_img else ""
     logo_row = (f'<tr><td style="padding-bottom:8px;"><img src="{_esc(company_logo)}" width="{top_logo_w}" style="display:block;width:{top_logo_w}px;max-width:100%;border-radius:4px;" alt="{company}" /></td></tr>') if logo_in_identity else ""
     identity = (
         f'<td style="vertical-align:top;padding-left:{"18px" if left_img else "0"};">'
@@ -590,7 +627,7 @@ def build_signature_html(user, s):
         if website:
             parts.append(f'<a href="{_esc(_norm_url(website))}" style="color:#1f2937;text-decoration:none;">{_esc(website)}</a>')
         contact_inline = ' &nbsp;<span style="color:#d1d5db;">·</span>&nbsp; '.join(parts)
-        photo_cell = (f'<td style="vertical-align:top;padding-right:16px;"><img src="{_esc(avatar)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;" alt="Photo" /></td>') if avatar else ""
+        photo_cell = (f'<td style="vertical-align:top;padding-right:16px;"><img src="{_esc(avatar)}" width="{avatar_w}" style="display:block;width:{avatar_w}px;border-radius:6px;" alt="Photo" /></td>') if avatar else ""
         content_logo = (
             (f'<img src="{_esc(company_logo)}" width="{top_logo_w}" style="display:block;width:{top_logo_w}px;max-width:100%;border-radius:4px;margin-bottom:8px;" alt="{company}" />' if logo_in_identity else "")
             + (f'<img src="{_esc(company_logo)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;margin-bottom:8px;" alt="{company}" />' if (not avatar and company_logo) else "")
