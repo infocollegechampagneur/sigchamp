@@ -118,13 +118,16 @@ export function buildSignatureHtml(user = {}, s = {}) {
     if (email) parts.push(`<a href="mailto:${email}" style="color:${textColor};text-decoration:none;">${email}</a>`);
     if (website) parts.push(`<a href="${esc(normUrl(website))}" style="color:${textColor};text-decoration:none;">${esc(website.replace(/^https?:\/\//i, ""))}</a>`);
     const contactInline = parts.join(' &nbsp;<span style="color:#d1d5db;">·</span>&nbsp; ');
-    const logoHtml =
-      (avatar ? `<img src="${esc(avatar)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;margin-bottom:8px;" alt="Photo" />` : "") +
+    const photoCell = avatar
+      ? `<td style="vertical-align:top;padding-right:16px;"><img src="${esc(avatar)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;" alt="Photo" /></td>`
+      : "";
+    const contentLogo =
       (logoInIdentity ? `<img src="${esc(companyLogo)}" width="${topLogoW}" style="display:block;width:${topLogoW}px;max-width:100%;border-radius:4px;margin-bottom:8px;" alt="${company}" />` : "") +
       (!avatar && companyLogo ? `<img src="${esc(companyLogo)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;margin-bottom:8px;" alt="${company}" />` : "");
     const modern =
-      `<td colspan="2" style="border-left:4px solid ${color};padding:2px 0 2px 16px;">` +
-      logoHtml +
+      photoCell +
+      `<td${avatar ? "" : ' colspan="2"'} style="border-left:4px solid ${color};padding:2px 0 2px 16px;">` +
+      contentLogo +
       `<div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:800;color:#0f172a;">${name}</div>` +
       (titleLine ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:${color};padding-top:1px;">${titleLine}</div>` : "") +
       (company ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-top:1px;">${company}</div>` : "") +

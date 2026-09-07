@@ -590,14 +590,16 @@ def build_signature_html(user, s):
         if website:
             parts.append(f'<a href="{_esc(_norm_url(website))}" style="color:#1f2937;text-decoration:none;">{_esc(website)}</a>')
         contact_inline = ' &nbsp;<span style="color:#d1d5db;">·</span>&nbsp; '.join(parts)
-        logo_html = (
-            (f'<img src="{_esc(avatar)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;margin-bottom:8px;" alt="Photo" />' if avatar else "")
-            + (f'<img src="{_esc(company_logo)}" width="{top_logo_w}" style="display:block;width:{top_logo_w}px;max-width:100%;border-radius:4px;margin-bottom:8px;" alt="{company}" />' if logo_in_identity else "")
+        photo_cell = (f'<td style="vertical-align:top;padding-right:16px;"><img src="{_esc(avatar)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;" alt="Photo" /></td>') if avatar else ""
+        content_logo = (
+            (f'<img src="{_esc(company_logo)}" width="{top_logo_w}" style="display:block;width:{top_logo_w}px;max-width:100%;border-radius:4px;margin-bottom:8px;" alt="{company}" />' if logo_in_identity else "")
             + (f'<img src="{_esc(company_logo)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;margin-bottom:8px;" alt="{company}" />' if (not avatar and company_logo) else "")
         )
+        content_colspan = "" if avatar else ' colspan="2"'
         modern = (
-            f'<td colspan="2" style="border-left:4px solid {color};padding:2px 0 2px 16px;">'
-            f'{logo_html}'
+            photo_cell
+            + f'<td{content_colspan} style="border-left:4px solid {color};padding:2px 0 2px 16px;">'
+            f'{content_logo}'
             f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:800;color:#0f172a;">{name}</div>'
             + (f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:{color};padding-top:1px;">{title_line}</div>' if title_line else "")
             + (f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-top:1px;">{company}</div>' if company else "")
