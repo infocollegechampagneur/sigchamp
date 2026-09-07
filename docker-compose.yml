@@ -26,7 +26,12 @@ services:
       ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
       EMERGENT_LLM_KEY: "${EMERGENT_LLM_KEY}"
       INTEGRATION_PROXY_URL: "${INTEGRATION_PROXY_URL}"
+      STORAGE_BACKEND: "${STORAGE_BACKEND:-local}"
+      LOCAL_STORAGE_DIR: "/data/storage"
+      DEPLOY_API_TOKEN: "${DEPLOY_API_TOKEN}"
       REACT_APP_BACKEND_URL: "${PUBLIC_URL}"
+    volumes:
+      - storage_data:/data/storage
     ports:
       - "8001:8001"
 
@@ -44,3 +49,4 @@ services:
 
 volumes:
   mongo_data:
+  storage_data:

@@ -862,8 +862,33 @@ def _ps_response(script: str, filename: str):
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
+DEPLOY_API_TOKEN = os.environ.get("DEPLOY_API_TOKEN", "")
+
+
+async def deploy_auth(request: Request, token: Optional[str] = Query(default=None),
+                      creds: Optional[HTTPAuthorizationCredentials] = Depends(security)):
+    """Allow either an admin JWT (interactive UI) or a static token (unattended scheduled tasks)."""
+    if DEPLOY_API_TOKEN and token and token == DEPLOY_API_TOKEN:
+        return {"role": "admin", "via": "token"}
+    user = await get_current_user(request, creds)
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Accès réservé aux administrateurs")
+    return user
+
+
+@api_router.get("/deploy/info")
+async def deploy_info(admin: dict = Depends(require_admin)):
+    base = BACKEND_PUBLIC_URL.rstrip("/")
+    tok = DEPLOY_API_TOKEN
+    return {
+        "has_token": bool(tok),
+        "exchange_url": f"{base}/api/deploy/exchange-script?token={tok}" if tok else "",
+        "gpo_url": f"{base}/api/deploy/gpo-script?token={tok}" if tok else "",
+    }
+
+
 @api_router.get("/deploy/exchange-script")
-async def deploy_exchange_script(admin: dict = Depends(require_admin)):
+async def deploy_exchange_script(_auth: dict = Depends(deploy_auth)):
     settings = await load_settings()
     users = await db.users.find({"role": "employee"}).to_list(1000)
     block = _ps_signatures_block(users, settings)
@@ -902,7 +927,7 @@ Write-Host "Termine. $($signatures.Count) signature(s) configuree(s)."
 
 
 @api_router.get("/deploy/gpo-script")
-async def deploy_gpo_script(admin: dict = Depends(require_admin)):
+async def deploy_gpo_script(_auth: dict = Depends(deploy_auth)):
     settings = await load_settings()
     users = await db.users.find({"role": "employee"}).to_list(1000)
     block = _ps_signatures_block(users, settings)

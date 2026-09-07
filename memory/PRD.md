@@ -41,6 +41,11 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
 - **Journal d'envois** : collection `send_log`, page « Envois courriel » affiche statut (Envoyée/Échec + erreur), destinataire, horodatage ; chaque envoi met à jour `last_send_status`/`last_sent_at`.
 - **Marquage « installée » manuel + relance manuelle** : bascule `signature_installed` par employé ; bouton « Relancer les non-installés » (`/api/email/send-reminders`) qui ne cible que les employés non marqués installés.
 
+## Itération 4 — Régénération auto & guide autonomie (2026-06)
+- **Régénération automatique** : les endpoints `/api/deploy/exchange-script` et `/gpo-script` acceptent désormais un `?token=DEPLOY_API_TOKEN` (en plus du JWT admin) → récupérables sans connexion par une tâche planifiée/cron. Endpoint `/api/deploy/info` (admin) + carte « Régénération automatique » dans la page Déploiement M365 (URLs copiables).
+- **Guide `SELF_HOSTING_M365_GUIDE.md`** (FR) : indépendance Emergent (stockage local), hébergement Windows/Linux/Render, **SMTP2Go** (`mail.smtp2go.com:587`), régénération auto (Task Scheduler/cron + connexion Exchange non-interactive cert-based), et déploiement M365 pas-à-pas (Exchange transport rules + GPO). Rappel : l'employé ne modifie que nom/poste/courriel/poste téléphonique.
+- `.env.example`, `docker-compose.yml` (volume storage persistant + `DEPLOY_API_TOKEN`) mis à jour.
+
 ## Backlog / prochaines pistes
 - P1 : envoi automatique de la signature par courriel à chaque employé.
 - P1 : plusieurs modèles/mises en page de signature au choix.

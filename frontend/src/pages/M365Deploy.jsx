@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/apiClient";
 import { Button } from "@/components/ui/button";
-import { Download, Loader2, ServerCog, MonitorCog, ShieldCheck } from "lucide-react";
+import { Download, Loader2, ServerCog, MonitorCog, ShieldCheck, RefreshCw, Copy } from "lucide-react";
 
 function useDownload() {
   const [loading, setLoading] = useState(null);
@@ -28,6 +28,11 @@ function useDownload() {
 
 export default function M365Deploy() {
   const { loading, download } = useDownload();
+  const [info, setInfo] = useState(null);
+
+  useEffect(() => { api.get("/deploy/info").then((r) => setInfo(r.data)).catch(() => {}); }, []);
+
+  const copy = (txt) => { navigator.clipboard.writeText(txt); toast.success("URL copiée."); };
 
   return (
     <div className="max-w-5xl mx-auto px-5 lg:px-8 py-8">
@@ -80,6 +85,35 @@ export default function M365Deploy() {
             </Button>
           </div>
         </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl bg-[#111827] border border-slate-800 p-6 sf-fade-up" data-testid="auto-regen-card">
+        <div className="flex items-center gap-2 mb-2">
+          <RefreshCw className="h-5 w-5 text-blue-400" />
+          <h3 className="font-display text-xl font-bold text-white">Régénération automatique</h3>
+        </div>
+        <p className="text-sm text-slate-400 mb-4">
+          Ces URL renvoient <b className="text-slate-200">toujours la version la plus à jour</b> des scripts (signatures + employés courants).
+          Faites-les récupérer par une <b className="text-slate-200">tâche planifiée</b> (Windows) ou un <b className="text-slate-200">cron</b> (Linux) pour ré-appliquer automatiquement après chaque changement. Voir le guide <code className="text-blue-300">SELF_HOSTING_M365_GUIDE.md</code>.
+        </p>
+        {info?.has_token ? (
+          <div className="space-y-3">
+            {[{ label: "Exchange Online", url: info.exchange_url }, { label: "GPO / Outlook", url: info.gpo_url }].map((r) => (
+              <div key={r.label}>
+                <p className="text-xs text-slate-500 mb-1">{r.label}</p>
+                <div className="flex gap-2">
+                  <code className="flex-1 text-xs text-blue-300 bg-slate-900 rounded-lg p-2.5 break-all font-mono">{r.url}</code>
+                  <Button onClick={() => copy(r.url)} variant="outline" size="sm" data-testid={`copy-auto-url-${r.label}`} className="shrink-0 border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-700 hover:text-white">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+            <p className="text-xs text-amber-300/80">⚠️ Ces URL contiennent un jeton secret (`DEPLOY_API_TOKEN`). Ne les partagez qu'avec votre équipe IT.</p>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">Définissez la variable d'environnement <code className="text-blue-300">DEPLOY_API_TOKEN</code> côté serveur pour activer les URL d'automatisation.</p>
+        )}
       </div>
 
       <div className="mt-6 rounded-2xl bg-blue-600/10 border border-blue-500/20 p-5 flex gap-3">
