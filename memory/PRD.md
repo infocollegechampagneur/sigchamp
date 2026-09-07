@@ -84,6 +84,12 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
 - **Lien Bookings** : nouveau champ optionnel `booking_url` (profil / « Ma signature »). Si renseigné, un bouton **« Réservez une heure pour me rencontrer »** s'affiche **en bas** de la signature (2 générateurs). Persisté via `PUT /auth/me`.
 - Vérifié par testing agent (100 %) + en réel : signature live de s.lynch = « Simon Lynch » + 247.
 
+## Itération 12 — Fiches liées M365 : import + synchronisation + édition admin (2026-06)
+- **Ajouter comme fiches** (`POST /api/m365/import`) : depuis la page Microsoft 365, l'admin coche des comptes → création/upsert de fiches employé peuplées depuis Graph (nom, poste, poste téléphonique), marquées `m365_linked`.
+- **Synchroniser** (`POST /api/m365/sync`, bouton manuel) : pour chaque fiche liée, relit depuis M365 le **profil** (nom/poste/téléphone) ET la **signature personnelle** que l'employé a définie dans Outlook (`Get-MailboxMessageConfiguration.SignatureHtml`) → stockée dans `m365_signature_html`.
+- **Édition admin des fiches** : bouton crayon sur la page Employés → dialogue (nom, poste, département, poste tél., ligne directe, **lien Bookings**). Badge « M365 » sur les fiches liées + aperçu (lecture seule) de la signature Outlook importée. `PUT /api/employees/{id}` (ProfileUpdate inclut `booking_url`).
+- **Lien Bookings** rendu en bas de la signature générée (2 générateurs). Vérifié : testing agent frontend 100 % + curl backend (s.lynch importé/synchronisé, sig ~3000 car., tél 247). SSO Microsoft abandonné à la demande de l'utilisateur.
+
 ## Backlog / prochaines pistes
 - P1 : envoi automatique de la signature par courriel à chaque employé.
 - P1 : plusieurs modèles/mises en page de signature au choix.

@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { UserPlus, Trash2, Loader2, ShieldCheck, Upload, Download, FileUp } from "lucide-react";
+import { UserPlus, Trash2, Loader2, ShieldCheck, Upload, Download, FileUp, Pencil } from "lucide-react";
 
 const empty = { email: "", password: "", name: "", title: "", phone_ext: "", direct_line: "", department: "" };
+const emptyEdit = { name: "", title: "", department: "", phone_ext: "", direct_line: "", booking_url: "" };
 
 export default function Employees() {
   const [list, setList] = useState([]);
@@ -21,11 +22,41 @@ export default function Employees() {
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState(emptyEdit);
+  const [editId, setEditId] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editSig, setEditSig] = useState("");
 
   const load = () => api.get("/employees").then((r) => setList(r.data));
   useEffect(() => { load(); }, []);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const setEdit = (k) => (e) => setEditForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const openEdit = (emp) => {
+    setEditId(emp.id);
+    setEditForm({
+      name: emp.name || "", title: emp.title || "", department: emp.department || "",
+      phone_ext: emp.phone_ext || "", direct_line: emp.direct_line || "", booking_url: emp.booking_url || "",
+    });
+    setEditSig(emp.m365_signature_html || "");
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    setSavingEdit(true);
+    try {
+      await api.put(`/employees/${editId}`, editForm);
+      toast.success("Fiche mise à jour.");
+      setEditOpen(false);
+      load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const downloadTemplate = () => {
     const csv = "name,email,password,title,department,phone_ext,direct_line\nMarie Tremblay,marie@entreprise.com,,Directrice,Direction,201,514 555-0101\nPaul Roy,paul@entreprise.com,,Vendeur,Ventes,202,\n";
@@ -243,19 +274,72 @@ export default function Employees() {
                   ) : (
                     <Badge className="bg-slate-700/50 text-slate-300 border-slate-600 hover:bg-slate-700/50">Employé</Badge>
                   )}
+                  {emp.m365_linked && <Badge className="ml-1 bg-blue-500/15 text-blue-300 border-blue-500/30 hover:bg-blue-500/15">M365</Badge>}
                 </TableCell>
                 <TableCell className="text-right">
-                  {emp.role !== "admin" && (
-                    <button onClick={() => remove(emp.id)} data-testid={`button-delete-employee-${emp.id}`} className="p-2 text-slate-400 hover:text-red-400 transition-colors">
-                      <Trash2 className="h-4 w-4" />
+                  <div className="flex items-center justify-end gap-1">
+                    <button onClick={() => openEdit(emp)} data-testid={`button-edit-employee-${emp.id}`} className="p-2 text-slate-400 hover:text-blue-400 transition-colors">
+                      <Pencil className="h-4 w-4" />
                     </button>
-                  )}
+                    {emp.role !== "admin" && (
+                      <button onClick={() => remove(emp.id)} data-testid={`button-delete-employee-${emp.id}`} className="p-2 text-slate-400 hover:text-red-400 transition-colors">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="bg-[#111827] border-slate-700 text-slate-100 max-w-lg" data-testid="edit-employee-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl">Modifier la fiche</DialogTitle>
+            <DialogDescription className="text-slate-400">Ces valeurs sont prioritaires sur Microsoft 365 lors du push.</DialogDescription>
+          </DialogHeader>
+          <div className="grid sm:grid-cols-2 gap-4 mt-2">
+            <div className="sm:col-span-2">
+              <Label className="text-slate-300">Nom complet</Label>
+              <Input data-testid="edit-emp-name" value={editForm.name} onChange={setEdit("name")} className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+            </div>
+            <div>
+              <Label className="text-slate-300">Poste / Titre</Label>
+              <Input data-testid="edit-emp-title" value={editForm.title} onChange={setEdit("title")} className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+            </div>
+            <div>
+              <Label className="text-slate-300">Département</Label>
+              <Input data-testid="edit-emp-department" value={editForm.department} onChange={setEdit("department")} className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+            </div>
+            <div>
+              <Label className="text-slate-300">Poste téléphonique</Label>
+              <Input data-testid="edit-emp-ext" value={editForm.phone_ext} onChange={setEdit("phone_ext")} className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+            </div>
+            <div>
+              <Label className="text-slate-300">Ligne directe</Label>
+              <Input data-testid="edit-emp-direct" value={editForm.direct_line} onChange={setEdit("direct_line")} className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+            </div>
+            <div className="sm:col-span-2">
+              <Label className="text-slate-300">Lien « Réserver une réunion » (Bookings)</Label>
+              <Input data-testid="edit-emp-booking" value={editForm.booking_url} onChange={setEdit("booking_url")} placeholder="https://outlook.office.com/bookwithme/user/…" className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+            </div>
+            {editSig && (
+              <div className="sm:col-span-2">
+                <Label className="text-slate-300">Signature actuelle dans Outlook (importée de M365)</Label>
+                <div data-testid="edit-emp-m365-signature" className="mt-1.5 rounded-lg border border-slate-700 bg-white p-3 max-h-52 overflow-auto" dangerouslySetInnerHTML={{ __html: editSig }} />
+                <p className="text-xs text-slate-500 mt-1.5">Ceci est la signature que l'employé a définie lui-même dans Outlook (lecture seule). Cliquez « Synchroniser » sur la page Microsoft 365 pour la rafraîchir.</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="mt-4">
+            <Button onClick={saveEdit} disabled={savingEdit} data-testid="button-save-employee-edit" className="bg-blue-600 hover:bg-blue-500 text-white font-semibold">
+              {savingEdit ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Pencil className="h-4 w-4 mr-2" />} Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

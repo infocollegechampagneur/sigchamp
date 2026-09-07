@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Cloud, Save, Loader2, Users, Send, CheckCircle2, Search, ShieldCheck, PlugZap, Trash2, XCircle } from "lucide-react";
+import { Cloud, Save, Loader2, Users, Send, CheckCircle2, Search, ShieldCheck, PlugZap, Trash2, XCircle, UserPlus, RefreshCw } from "lucide-react";
 
 export default function M365Connect() {
   const [cfg, setCfg] = useState({ tenant_id: "", client_id: "", client_secret: "", tenant_domain: "", has_secret: false, connected: false });
@@ -86,6 +86,29 @@ export default function M365Connect() {
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); } finally { setTesting(false); }
   };
 
+  const [importing, setImporting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const importFiches = async () => {
+    if (!selectedEmails.length) { toast.error("Sélectionnez au moins un utilisateur."); return; }
+    setImporting(true); setLastErrors([]);
+    try {
+      const { data } = await api.post("/m365/import", { emails: selectedEmails });
+      toast.success(`${data.imported_count} fiche(s) créée(s), ${data.updated_count} mise(s) à jour.`);
+      if (data.failed?.length) setLastErrors(data.failed);
+      loadUsers();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); } finally { setImporting(false); }
+  };
+
+  const syncFiches = async () => {
+    setSyncing(true); setLastErrors([]);
+    try {
+      const { data } = await api.post("/m365/sync");
+      toast.success(`${data.synced_count} fiche(s) synchronisée(s) depuis Microsoft 365.`);
+      if (data.failed?.length) setLastErrors(data.failed);
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); } finally { setSyncing(false); }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-5 lg:px-8 py-8">
       <div className="mb-8">
@@ -150,9 +173,15 @@ export default function M365Connect() {
       <div className="rounded-2xl bg-[#111827] border border-slate-800 p-6 sf-fade-up">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <div className="flex items-center gap-2"><Users className="h-5 w-5 text-blue-400" /><h3 className="font-semibold text-white">Adresses du tenant {users.length > 0 && `(${users.length})`}</h3></div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button onClick={loadUsers} disabled={loading} data-testid="button-load-m365-users" variant="outline" className="border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-700 hover:text-white">
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Users className="h-4 w-4 mr-2" />} Charger les utilisateurs
+            </Button>
+            <Button onClick={importFiches} disabled={importing || !selectedEmails.length} data-testid="button-import-fiches-m365" variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
+              {importing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />} Ajouter comme fiches ({selectedEmails.length})
+            </Button>
+            <Button onClick={syncFiches} disabled={syncing} data-testid="button-sync-fiches-m365" variant="outline" className="border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-700 hover:text-white">
+              {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />} Synchroniser
             </Button>
             <Button onClick={removeRules} disabled={removing || !selectedEmails.length} data-testid="button-remove-m365" variant="outline" className="border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20">
               {removing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />} Retirer ({selectedEmails.length})

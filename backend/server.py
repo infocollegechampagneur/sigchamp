@@ -315,6 +315,9 @@ def user_to_public(u: dict) -> dict:
         "avatar_url": u.get("avatar_url", ""),
         "avatar_width": int(u.get("avatar_width") or 0),
         "booking_url": u.get("booking_url", ""),
+        "m365_linked": bool(u.get("m365_linked", False)),
+        "m365_signature_html": u.get("m365_signature_html", ""),
+        "m365_synced_at": u.get("m365_synced_at"),
         "signature_installed": bool(u.get("signature_installed", False)),
         "installed_at": u.get("installed_at"),
         "last_sent_at": u.get("last_sent_at"),
@@ -1283,6 +1286,31 @@ def _graph_get_user(cfg: dict, email: str) -> dict:
     return {}
 
 
+def _m365_get_signature(cfg: dict, email: str) -> str:
+    """Récupère la signature que l'employé a définie lui-même dans Outlook (OWA)."""
+    try:
+        r = _exo_invoke(cfg, "Get-MailboxMessageConfiguration", {"Identity": email})
+        if r.status_code < 300:
+            v = r.json().get("value", [])
+            if v:
+                return v[0].get("SignatureHtml") or ""
+    except Exception:
+        pass
+    return ""
+
+
+def _m365_provision_fields(cfg: dict, email: str) -> dict:
+    g = _graph_get_user(cfg, email)
+    return {
+        "name": g.get("displayName") or email.split("@")[0],
+        "title": g.get("jobTitle") or "",
+        "department": g.get("department") or "",
+        "phone_ext": _clean_ext(g.get("businessPhones")),
+        "direct_line": g.get("mobilePhone") or "",
+        "m365_signature_html": _m365_get_signature(cfg, email),
+    }
+
+
 def _exo_invoke(cfg: dict, cmdlet: str, params: dict):
     tok = _m365_token(cfg, "https://outlook.office365.com/.default")
     # L'API adminapi Exchange n'accepte PAS un domaine vanité (ex. champagneur.qc.ca) => 401.
@@ -1360,6 +1388,55 @@ async def m365_users(admin: dict = Depends(require_admin)):
 async def _iter_employee_emails():
     for u in await db.users.find({}, {"email": 1}).to_list(2000):
         yield {"email": u.get("email", "")}
+
+
+@api_router.post("/m365/import")
+async def m365_import(data: M365PushInput, admin: dict = Depends(require_admin)):
+    cfg = await _m365_cfg()
+    if not cfg.get("client_secret"):
+        raise HTTPException(status_code=400, detail="Microsoft 365 non configuré.")
+    imported, updated, failed = [], [], []
+    for email in data.emails:
+        email = email.strip().lower()
+        if not email:
+            continue
+        try:
+            fields = await asyncio.to_thread(_m365_provision_fields, cfg, email)
+            doc = {**fields, "email": email, "role": "employee", "m365_linked": True,
+                   "m365_synced_at": datetime.now(timezone.utc).isoformat()}
+            existing = await db.users.find_one({"email": email})
+            if existing:
+                await db.users.update_one({"_id": existing["_id"]}, {"$set": doc})
+                updated.append(email)
+            else:
+                doc["created_at"] = datetime.now(timezone.utc).isoformat()
+                await db.users.insert_one(doc)
+                imported.append(email)
+        except Exception as e:
+            failed.append({"email": email, "error": str(e)})
+    return {"imported": imported, "updated": updated, "failed": failed,
+            "imported_count": len(imported), "updated_count": len(updated)}
+
+
+@api_router.post("/m365/sync")
+async def m365_sync(admin: dict = Depends(require_admin)):
+    cfg = await _m365_cfg()
+    if not cfg.get("client_secret"):
+        raise HTTPException(status_code=400, detail="Microsoft 365 non configuré.")
+    linked = await db.users.find({"m365_linked": True}, {"email": 1}).to_list(2000)
+    synced, failed = [], []
+    for u in linked:
+        email = (u.get("email") or "").lower()
+        if not email:
+            continue
+        try:
+            fields = await asyncio.to_thread(_m365_provision_fields, cfg, email)
+            fields["m365_synced_at"] = datetime.now(timezone.utc).isoformat()
+            await db.users.update_one({"_id": u["_id"]}, {"$set": fields})
+            synced.append(email)
+        except Exception as e:
+            failed.append({"email": email, "error": str(e)})
+    return {"synced": synced, "failed": failed, "synced_count": len(synced)}
 
 
 @api_router.post("/m365/push")
