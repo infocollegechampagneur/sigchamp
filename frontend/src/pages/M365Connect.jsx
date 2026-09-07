@@ -63,11 +63,11 @@ export default function M365Connect() {
 
   const removeRules = async () => {
     if (!selectedEmails.length) { toast.error("Sélectionnez au moins un utilisateur."); return; }
-    if (!window.confirm(`Retirer la règle de signature M365 de ${selectedEmails.length} utilisateur(s) ?`)) return;
+    if (!window.confirm(`Retirer la signature M365 de ${selectedEmails.length} utilisateur(s) ?`)) return;
     setRemoving(true); setLastErrors([]);
     try {
       const { data } = await api.post("/m365/remove", { emails: selectedEmails });
-      if (data.removed_count) toast.success(`${data.removed_count} règle(s) retirée(s).`);
+      if (data.removed_count) toast.success(`${data.removed_count} signature(s) retirée(s).`);
       if (data.failed?.length) {
         setLastErrors(data.failed);
         toast.error(`${data.failed.length} échec(s) — ${data.failed[0].error}`, { duration: 15000 });
@@ -136,10 +136,12 @@ export default function M365Connect() {
         <div className="mt-4 flex gap-3 text-xs text-slate-400 bg-slate-800/40 border border-slate-700/60 rounded-xl p-3">
           <ShieldCheck className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
           <div>
-            Créez une <b className="text-slate-200">App registration</b> dans Entra ID avec les permissions d'application
-            <code className="text-blue-300"> User.Read.All</code> (Graph) et <code className="text-blue-300"> Exchange.ManageAsApp</code>,
-            accordez le consentement admin, et attribuez le rôle <b className="text-slate-200">Administrateur Exchange</b> à l'application.
-            Détails dans <code className="text-blue-300">SELF_HOSTING_M365_GUIDE.md</code>.
+            « Pousser » définit la <b className="text-slate-200">signature du compte</b> (visible dans Outlook sur le web, Nouveau Outlook et Outlook mobile, ajoutée automatiquement aux nouveaux courriels et réponses). Pour <b className="text-slate-200">Outlook classique installé</b> sur les postes, utilisez le script GPO de la page « Déploiement M365 » (signatures stockées localement).
+            <div className="mt-2 pt-2 border-t border-slate-700/60">
+              Prérequis Entra ID : une <b className="text-slate-200">App registration</b> avec les permissions d'application
+              <code className="text-blue-300"> User.Read.All</code> (Graph) et <code className="text-blue-300"> Exchange.ManageAsApp</code>,
+              le consentement admin, et le rôle <b className="text-slate-200">Administrateur Exchange</b> attribué à l'application.
+            </div>
           </div>
         </div>
       </div>

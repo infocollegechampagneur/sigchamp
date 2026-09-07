@@ -1,0 +1,16 @@
+{
+  "summary": "Verified the fix that switches M365 push from an invisible Exchange transport rule to setting the actual mailbox signature via Set-MailboxMessageConfiguration. Backend: GET /api/m365/test => graph_ok=true, exchange_ok=true. POST /api/m365/push with s.lynch@champagneur.qc.ca => applied_count=1, applied=['s.lynch@champagneur.qc.ca'], failed=[]. Idempotent: two consecutive pushes both return applied_count=1 (no error). Frontend (/app/m365): 'Tester la connexion' shows 'Microsoft Graph (lister) : OK' and 'Exchange (pousser) : OK'. Help/info box mentions Outlook Web, Nouveau Outlook, Outlook mobile and the GPO script for Outlook classique. 'Charger les utilisateurs' loaded 1162 mailboxes; selecting s.lynch@champagneur.qc.ca and clicking 'Pousser (1)' completes successfully with NO red m365-push-errors panel. The Retirer button is present (wording 'Retirer (N)' — consistent with the request that the confirm dialog says 'Retirer la signature M365').",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "informatique@champagneur.qc.ca / sig3713+",
+  "seed_data_creation": "Real mailbox signature set on s.lynch@champagneur.qc.ca in the live customer M365 tenant via Set-MailboxMessageConfiguration (intended). The previous transport rule 'SigChamp - s.lynch@champagneur.qc.ca' is gone (404) as verified previously by main agent.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "M365 push mechanism now uses Set-MailboxMessageConfiguration (visible signature in Outlook Web/New Outlook/Mobile) plus transport-rule cleanup. Both /api/m365/test and /api/m365/push are green end-to-end. Frontend flow shows success and displays no push-errors panel. The success toast auto-dismisses quickly so it may not be captured if screenshot is taken after long waits, but the absence of the m365-push-errors panel and the backend applied_count=1 confirm success. Login response field is 'token'.",
+  "rca of the issue": "Previous implementation created a server-side Exchange transport rule (disclaimer append at send-time) which is invisible in the Outlook UI. The user expected to actually see the signature in the Outlook composer. Fix: server.py m365_push now issues Set-MailboxMessageConfiguration -Identity {email} -SignatureHtml {html} -AutoAddSignature:$true -AutoAddSignatureOnReply:$true -AutoAddSignatureOnMobile:$true, and removes any leftover 'SigChamp - {email}' transport rule to avoid double-signing. m365_remove clears SignatureHtml and disables AutoAdd flags. Verified live."
+}

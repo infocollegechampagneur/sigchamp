@@ -1351,20 +1351,17 @@ async def m365_push(data: M365PushInput, admin: dict = Depends(require_admin)):
                 "name": (emp or {}).get("name") or email.split("@")[0]}
         html = build_signature_html(user, settings)
         rule = f"SigChamp - {email}"
-        params = {"Name": rule, "From": [email], "ApplyHtmlDisclaimerText": html,
-                  "ApplyHtmlDisclaimerLocation": "Append", "ApplyHtmlDisclaimerFallbackAction": data.fallback}
         try:
-            # Retirer la signature active existante (le cas échéant) avant de poser la nouvelle,
-            # pour garantir un remplacement propre sans doublon ni ancien contenu.
+            # Nettoyage : retirer l'ancienne règle de flux (méthode précédente) pour éviter une signature en double.
             try:
                 await asyncio.to_thread(_exo_invoke, cfg, "Remove-TransportRule", {"Identity": rule, "Confirm": False})
             except Exception:
                 pass
-            r = await asyncio.to_thread(_exo_invoke, cfg, "New-TransportRule", params)
-            if r.status_code >= 400 and ("already exists" in r.text or "existe" in r.text):
-                sparams = {"Identity": rule, "From": [email], "ApplyHtmlDisclaimerText": html,
-                           "ApplyHtmlDisclaimerLocation": "Append", "ApplyHtmlDisclaimerFallbackAction": data.fallback}
-                r = await asyncio.to_thread(_exo_invoke, cfg, "Set-TransportRule", sparams)
+            # Définir la vraie signature du compte (visible dans Outlook Web / Nouveau Outlook / Mobile,
+            # et ajoutée automatiquement aux nouveaux courriels et réponses).
+            params = {"Identity": email, "SignatureHtml": html,
+                      "AutoAddSignature": True, "AutoAddSignatureOnReply": True, "AutoAddSignatureOnMobile": True}
+            r = await asyncio.to_thread(_exo_invoke, cfg, "Set-MailboxMessageConfiguration", params)
             if r.status_code < 300:
                 applied.append(email)
                 if emp:
@@ -1425,7 +1422,15 @@ async def m365_remove(data: M365PushInput, admin: dict = Depends(require_admin))
             continue
         rule = f"SigChamp - {email}"
         try:
-            r = await asyncio.to_thread(_exo_invoke, cfg, "Remove-TransportRule", {"Identity": rule, "Confirm": False})
+            # Effacer la signature du compte (Web / Nouveau Outlook / Mobile).
+            clear = {"Identity": email, "SignatureHtml": "",
+                     "AutoAddSignature": False, "AutoAddSignatureOnReply": False, "AutoAddSignatureOnMobile": False}
+            r = await asyncio.to_thread(_exo_invoke, cfg, "Set-MailboxMessageConfiguration", clear)
+            # Retirer aussi une éventuelle ancienne règle de flux (méthode précédente).
+            try:
+                await asyncio.to_thread(_exo_invoke, cfg, "Remove-TransportRule", {"Identity": rule, "Confirm": False})
+            except Exception:
+                pass
             low = "".join(ch for ch in r.text if ch.isprintable()).lower()
             not_found = any(s in low for s in ["couldn't be found", "wasn't found", "n'existe", "not found", "objectnotfound"])
             if r.status_code < 300 or not_found:
