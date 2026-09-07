@@ -126,6 +126,9 @@ export default function M365Deploy() {
               </div>
             ))}
             <p className="text-xs text-amber-300/80">⚠️ Ces URL contiennent un jeton secret (`DEPLOY_API_TOKEN`). Ne les partagez qu'avec votre équipe IT.</p>
+            <p className="text-xs text-slate-500" data-testid="token-rotated-at">
+              Dernière rotation du jeton : {info.rotated_at ? new Date(info.rotated_at).toLocaleString("fr-CA") : "jamais (jeton initial)"}
+            </p>
           </div>
         ) : (
           <p className="text-sm text-slate-500">Définissez la variable d'environnement <code className="text-blue-300">DEPLOY_API_TOKEN</code> côté serveur pour activer les URL d'automatisation.</p>

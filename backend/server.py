@@ -6,6 +6,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 import io
+import csv
 import uuid
 import secrets
 import logging
@@ -822,6 +823,88 @@ async def create_employee(data: EmployeeCreate, admin: dict = Depends(require_ad
     return user_to_public(doc)
 
 
+_IMPORT_MAP = {
+    "name": "name", "nom": "name", "full name": "name", "nom complet": "name",
+    "email": "email", "courriel": "email", "e-mail": "email", "mail": "email",
+    "password": "password", "mot de passe": "password", "motdepasse": "password",
+    "title": "title", "poste": "title", "titre": "title", "fonction": "title",
+    "department": "department", "departement": "department", "département": "department", "service": "department",
+    "phone_ext": "phone_ext", "poste telephonique": "phone_ext", "poste téléphonique": "phone_ext",
+    "extension": "phone_ext", "poste tel": "phone_ext",
+    "direct_line": "direct_line", "ligne directe": "direct_line", "telephone": "direct_line", "téléphone": "direct_line",
+}
+
+
+def _norm_row(raw: dict) -> dict:
+    out = {}
+    for k, v in raw.items():
+        if k is None:
+            continue
+        key = _IMPORT_MAP.get(str(k).strip().lower())
+        if key:
+            out[key] = ("" if v is None else str(v)).strip()
+    return out
+
+
+def _parse_import(filename: str, data: bytes) -> list:
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    rows = []
+    if ext in ("xlsx", "xlsm"):
+        from openpyxl import load_workbook
+        wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+        ws = wb.active
+        header = None
+        for r in ws.iter_rows(values_only=True):
+            if header is None:
+                header = [str(c).strip() if c is not None else "" for c in r]
+                continue
+            if all(c is None or str(c).strip() == "" for c in r):
+                continue
+            rows.append(_norm_row(dict(zip(header, r))))
+    else:
+        text = data.decode("utf-8-sig", errors="replace")
+        reader = csv.DictReader(io.StringIO(text))
+        for r in reader:
+            rows.append(_norm_row(r))
+    return rows
+
+
+@api_router.post("/employees/import")
+async def import_employees(file: UploadFile = File(...), admin: dict = Depends(require_admin)):
+    data = await file.read()
+    try:
+        rows = _parse_import(file.filename or "import.csv", data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Fichier illisible : {e}")
+
+    created, skipped, errors = [], [], []
+    for i, row in enumerate(rows, start=2):
+        email = (row.get("email") or "").lower().strip()
+        name = (row.get("name") or "").strip()
+        if not email:
+            errors.append({"row": i, "error": "Courriel manquant"})
+            continue
+        if "@" not in email:
+            errors.append({"row": i, "error": f"Courriel invalide : {email}"})
+            continue
+        if await db.users.find_one({"email": email}):
+            skipped.append(email)
+            continue
+        password = row.get("password") or secrets.token_urlsafe(8)
+        doc = {
+            "email": email, "password_hash": hash_password(password),
+            "name": name or email.split("@")[0], "role": "employee",
+            "title": row.get("title", ""), "phone_ext": row.get("phone_ext", ""),
+            "direct_line": row.get("direct_line", ""), "department": row.get("department", ""),
+            "avatar_url": "", "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.users.insert_one(doc)
+        created.append({"email": email, "name": doc["name"], "password": password})
+
+    return {"created": created, "skipped": skipped, "errors": errors,
+            "created_count": len(created), "skipped_count": len(skipped)}
+
+
 @api_router.put("/employees/{emp_id}")
 async def update_employee(emp_id: str, data: ProfileUpdate, admin: dict = Depends(require_admin)):
     update = {k: v for k, v in data.model_dump().items() if v is not None}
@@ -896,14 +979,21 @@ async def deploy_auth(request: Request, token: Optional[str] = Query(default=Non
 
 @api_router.get("/deploy/info")
 async def deploy_info(admin: dict = Depends(require_admin)):
-    return _deploy_urls(await get_deploy_token())
+    doc = await db.config.find_one({"key": "deploy"}) or {}
+    res = _deploy_urls(await get_deploy_token())
+    res["rotated_at"] = doc.get("rotated_at")
+    return res
 
 
 @api_router.post("/deploy/rotate-token")
 async def rotate_deploy_token(admin: dict = Depends(require_admin)):
     new_token = secrets.token_urlsafe(24)
-    await db.config.update_one({"key": "deploy"}, {"$set": {"token": new_token}}, upsert=True)
-    return _deploy_urls(new_token)
+    now = datetime.now(timezone.utc).isoformat()
+    await db.config.update_one({"key": "deploy"},
+                               {"$set": {"token": new_token, "rotated_at": now}}, upsert=True)
+    res = _deploy_urls(new_token)
+    res["rotated_at"] = now
+    return res
 
 
 @api_router.get("/deploy/exchange-script")

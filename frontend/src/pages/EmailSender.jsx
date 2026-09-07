@@ -48,6 +48,17 @@ export default function EmailSender() {
       const { data } = await api.get("/smtp");
       setCfg((c) => ({ ...c, ...data, password: "" }));
       toast.success("Paramètres SMTP enregistrés.");
+      // Test automatique juste après l'enregistrement
+      const dest = data.from_email || data.username;
+      if (dest) {
+        toast.info(`Envoi d'un test automatique à ${dest}…`);
+        try {
+          await api.post("/email/test", { to: dest });
+          toast.success(`Test réussi ✅ — courriel envoyé à ${dest}.`);
+        } catch (te) {
+          toast.error(`Test échoué : ${formatApiError(te.response?.data?.detail)}`);
+        }
+      }
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); } finally { setSavingCfg(false); }
   };
 

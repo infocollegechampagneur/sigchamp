@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { UserPlus, Trash2, Loader2, ShieldCheck } from "lucide-react";
+import { UserPlus, Trash2, Loader2, ShieldCheck, Upload, Download, FileUp } from "lucide-react";
 
 const empty = { email: "", password: "", name: "", title: "", phone_ext: "", direct_line: "", department: "" };
 
@@ -18,11 +18,50 @@ export default function Employees() {
   const [form, setForm] = useState(empty);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState(null);
 
   const load = () => api.get("/employees").then((r) => setList(r.data));
   useEffect(() => { load(); }, []);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const downloadTemplate = () => {
+    const csv = "name,email,password,title,department,phone_ext,direct_line\nMarie Tremblay,marie@entreprise.com,,Directrice,Direction,201,514 555-0101\nPaul Roy,paul@entreprise.com,,Vendeur,Ventes,202,\n";
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "modele-employes.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const doImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setResult(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const { data } = await api.post("/employees/import", fd);
+      setResult(data);
+      toast.success(`${data.created_count} créé(s), ${data.skipped_count} ignoré(s), ${data.errors.length} erreur(s).`);
+      load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setImporting(false);
+      e.target.value = "";
+    }
+  };
+
+  const copyCredentials = () => {
+    const lines = ["email,password", ...result.created.map((c) => `${c.email},${c.password}`)].join("\n");
+    navigator.clipboard.writeText(lines);
+    toast.success("Identifiants copiés (email,mot de passe).");
+  };
 
   const create = async () => {
     setError("");
@@ -58,12 +97,72 @@ export default function Employees() {
           <h1 className="font-display text-3xl lg:text-4xl font-extrabold text-white mt-1">Employés</h1>
           <p className="text-slate-400 mt-2">Créez des comptes. Chaque employé gère ensuite ses coordonnées.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-employee" className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6">
-              <UserPlus className="h-4 w-4 mr-2" /> Nouvel employé
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Dialog open={importOpen} onOpenChange={(o) => { setImportOpen(o); if (!o) setResult(null); }}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-import-employees" variant="outline" className="h-11 border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-700 hover:text-white font-semibold px-5">
+                <FileUp className="h-4 w-4 mr-2" /> Importer
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-[#111827] border-slate-700 text-slate-100 max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="font-display text-2xl">Importer des employés</DialogTitle>
+                <DialogDescription className="text-slate-400">Fichier CSV ou Excel (.xlsx). Colonnes : name, email, password (optionnel), title, department, phone_ext, direct_line.</DialogDescription>
+              </DialogHeader>
+              <div className="mt-2 space-y-4">
+                <button onClick={downloadTemplate} data-testid="button-download-template" className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300">
+                  <Download className="h-4 w-4" /> Télécharger le modèle CSV
+                </button>
+                <input id="import-input" type="file" accept=".csv,.xlsx,.xlsm" className="hidden" onChange={doImport} data-testid="input-import-file" />
+                <button
+                  onClick={() => document.getElementById("import-input").click()}
+                  disabled={importing}
+                  className="w-full border-2 border-dashed border-slate-700 rounded-xl py-8 flex flex-col items-center gap-2 text-slate-400 hover:border-blue-500 hover:text-blue-400 transition-colors"
+                >
+                  {importing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
+                  <span className="text-sm font-medium">Cliquez pour choisir un fichier CSV / Excel</span>
+                  <span className="text-xs text-slate-600">Les mots de passe vides sont générés automatiquement</span>
+                </button>
+
+                {result && (
+                  <div className="rounded-xl bg-slate-800/50 border border-slate-700 p-4" data-testid="import-result">
+                    <div className="flex gap-4 text-sm mb-3">
+                      <span className="text-emerald-400">{result.created_count} créé(s)</span>
+                      <span className="text-slate-400">{result.skipped_count} ignoré(s)</span>
+                      <span className="text-red-400">{result.errors.length} erreur(s)</span>
+                    </div>
+                    {result.created.length > 0 && (
+                      <>
+                        <div className="max-h-40 overflow-y-auto space-y-1 mb-3">
+                          {result.created.map((c) => (
+                            <div key={c.email} className="flex justify-between text-xs font-mono">
+                              <span className="text-slate-300 truncate">{c.email}</span>
+                              <span className="text-blue-300 ml-2">{c.password}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <Button onClick={copyCredentials} data-testid="button-copy-credentials" size="sm" variant="outline" className="border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-700 hover:text-white">
+                          <Download className="h-4 w-4 mr-2" /> Copier les identifiants
+                        </Button>
+                      </>
+                    )}
+                    {result.errors.length > 0 && (
+                      <div className="mt-3 text-xs text-red-400/80 space-y-0.5">
+                        {result.errors.slice(0, 8).map((er, i) => <div key={i}>Ligne {er.row} : {er.error}</div>)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-employee" className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6">
+                <UserPlus className="h-4 w-4 mr-2" /> Nouvel employé
+              </Button>
+            </DialogTrigger>
           <DialogContent className="bg-[#111827] border-slate-700 text-slate-100 max-w-lg">
             <DialogHeader>
               <DialogTitle className="font-display text-2xl">Nouvel employé</DialogTitle>
@@ -107,6 +206,7 @@ export default function Employees() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="rounded-2xl bg-[#111827] border border-slate-800 overflow-hidden sf-fade-up">
