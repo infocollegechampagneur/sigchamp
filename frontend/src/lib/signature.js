@@ -49,7 +49,11 @@ export function buildSignatureHtml(user = {}, s = {}) {
   const website = s.website || "";
   const address = esc(s.address || "");
   const disclaimer = esc(s.disclaimer || "");
-  const logo = user.avatar_url || s.logo_url || "";
+  const avatar = user.avatar_url || "";
+  const companyLogo = s.logo_url || "";
+  const leftImg = avatar || companyLogo;
+  const logoInIdentity = !!(avatar && companyLogo);
+  const topLogoW = Math.min(logoW + 30, 140);
   const banner = resolveBanner(user, s);
   const gifUrl = banner.gif_url || "";
   const bannerLink = normUrl(banner.banner_link);
@@ -85,15 +89,20 @@ export function buildSignatureHtml(user = {}, s = {}) {
   if (address)
     contactLines.push(`<tr><td style="padding:1px 0;font-size:12px;color:${mutedColor};">${address}</td></tr>`);
 
-  const logoCell = logo
+  const logoCell = leftImg
     ? `<td style="vertical-align:top;padding-right:18px;border-right:3px solid ${color};">
-         <img src="${esc(logo)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;" alt="${company}" />
+         <img src="${esc(leftImg)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;" alt="${company}" />
        </td>`
     : "";
 
+  const logoRow = logoInIdentity
+    ? `<tr><td style="padding-bottom:8px;"><img src="${esc(companyLogo)}" width="${topLogoW}" style="display:block;width:${topLogoW}px;max-width:100%;border-radius:4px;" alt="${company}" /></td></tr>`
+    : "";
+
   const identityCell = `
-    <td style="vertical-align:top;padding-left:${logo ? "18px" : "0"};">
+    <td style="vertical-align:top;padding-left:${leftImg ? "18px" : "0"};">
       <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+        ${logoRow}
         <tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:800;color:#0f172a;padding-bottom:2px;">${name}</td></tr>
         ${titleLine ? `<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:${color};padding-bottom:2px;">${titleLine}</td></tr>` : ""}
         ${company ? `<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-bottom:6px;">${company}</td></tr>` : ""}
@@ -109,7 +118,10 @@ export function buildSignatureHtml(user = {}, s = {}) {
     if (email) parts.push(`<a href="mailto:${email}" style="color:${textColor};text-decoration:none;">${email}</a>`);
     if (website) parts.push(`<a href="${esc(normUrl(website))}" style="color:${textColor};text-decoration:none;">${esc(website.replace(/^https?:\/\//i, ""))}</a>`);
     const contactInline = parts.join(' &nbsp;<span style="color:#d1d5db;">·</span>&nbsp; ');
-    const logoHtml = logo ? `<img src="${esc(logo)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;margin-bottom:8px;" alt="${company}" />` : "";
+    const logoHtml =
+      (avatar ? `<img src="${esc(avatar)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;margin-bottom:8px;" alt="Photo" />` : "") +
+      (logoInIdentity ? `<img src="${esc(companyLogo)}" width="${topLogoW}" style="display:block;width:${topLogoW}px;max-width:100%;border-radius:4px;margin-bottom:8px;" alt="${company}" />` : "") +
+      (!avatar && companyLogo ? `<img src="${esc(companyLogo)}" width="${logoW}" style="display:block;width:${logoW}px;border-radius:6px;margin-bottom:8px;" alt="${company}" />` : "");
     const modern =
       `<td colspan="2" style="border-left:4px solid ${color};padding:2px 0 2px 16px;">` +
       logoHtml +

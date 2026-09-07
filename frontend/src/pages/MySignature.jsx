@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Upload, Save, Loader2 } from "lucide-react";
+import { Upload, Save, Loader2, Trash2 } from "lucide-react";
 
 export default function MySignature() {
   const { user, refreshUser } = useAuth();
@@ -61,6 +61,17 @@ export default function MySignature() {
     }
   };
 
+  const removeAvatar = async () => {
+    setForm((f) => ({ ...f, avatar_url: "" }));
+    try {
+      await api.put("/auth/me", { ...form, avatar_url: "" });
+      await refreshUser();
+      toast.success("Photo retirée.");
+    } catch {
+      toast.error("Échec du retrait.");
+    }
+  };
+
   const previewUser = { ...user, ...form };
 
   return (
@@ -86,16 +97,28 @@ export default function MySignature() {
               </Avatar>
               <div>
                 <input id="avatar-input" type="file" accept="image/*" className="hidden" onChange={uploadAvatar} data-testid="input-upload-avatar" />
-                <Button
-                  variant="outline"
-                  onClick={() => document.getElementById("avatar-input").click()}
-                  disabled={uploading}
-                  className="border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-700 hover:text-white"
-                >
-                  {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                  Photo (optionnel)
-                </Button>
-                <p className="text-xs text-slate-500 mt-1.5">Sinon le logo de l'entreprise s'affiche.</p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => document.getElementById("avatar-input").click()}
+                    disabled={uploading}
+                    className="border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-700 hover:text-white"
+                  >
+                    {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                    Photo (optionnel)
+                  </Button>
+                  {form.avatar_url && (
+                    <Button
+                      variant="outline"
+                      onClick={removeAvatar}
+                      data-testid="button-remove-avatar"
+                      className="border-red-900/60 bg-red-950/30 text-red-300 hover:bg-red-900/40 hover:text-red-200"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Retirer
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1.5">Votre photo s'affichera avec le logo de l'entreprise.</p>
               </div>
             </div>
 

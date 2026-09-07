@@ -46,6 +46,10 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
 - **Guide `SELF_HOSTING_M365_GUIDE.md`** (FR) : indépendance Emergent (stockage local), hébergement Windows/Linux/Render, **SMTP2Go** (`mail.smtp2go.com:587`), régénération auto (Task Scheduler/cron + connexion Exchange non-interactive cert-based), et déploiement M365 pas-à-pas (Exchange transport rules + GPO). Rappel : l'employé ne modifie que nom/poste/courriel/poste téléphonique.
 - `.env.example`, `docker-compose.yml` (volume storage persistant + `DEPLOY_API_TOKEN`) mis à jour.
 
+## Itération 5 — Photo employé + logo & bouton retrait (2026-06)
+- **Photo + logo ensemble** : quand un employé ajoute sa photo, la signature affiche la photo à gauche (avec la barre verticale d'accent) ET le logo de l'entreprise au-dessus du nom (dans la cellule identité). Sans photo, comportement inchangé (logo à gauche). Appliqué aux deux générateurs : `frontend/src/lib/signature.js` (classic + modern) et `backend/server.py build_signature_html`.
+- **Bouton « Retirer »** : dans « Ma signature », bouton pour enlever la photo (revient au logo seul), sans toucher au reste des informations. Texte d'aide mis à jour : « Votre photo s'affichera avec le logo de l'entreprise. »
+
 ## Backlog / prochaines pistes
 - P1 : envoi automatique de la signature par courriel à chaque employé.
 - P1 : plusieurs modèles/mises en page de signature au choix.

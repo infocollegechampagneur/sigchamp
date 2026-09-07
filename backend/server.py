@@ -531,7 +531,11 @@ def build_signature_html(user, s):
     website = s.get("website") or ""
     address = _esc(s.get("address") or "")
     disclaimer = _esc(s.get("disclaimer") or "")
-    logo = user.get("avatar_url") or s.get("logo_url") or ""
+    avatar = user.get("avatar_url") or ""
+    company_logo = s.get("logo_url") or ""
+    left_img = avatar or company_logo
+    logo_in_identity = bool(avatar and company_logo)
+    top_logo_w = min(logo_w + 30, 140)
 
     title_line = " · ".join([x for x in [title, dept] if x])
     phone_parts = [p for p in [phone_main, (f"poste {ext}" if ext else "")] if p]
@@ -558,10 +562,12 @@ def build_signature_html(user, s):
     social_row = f'<tr><td style="padding-top:6px;font-family:Arial,Helvetica,sans-serif;">{sep.join(social_links)}</td></tr>' if social_links else ""
 
     logo_cell = (f'<td style="vertical-align:top;padding-right:18px;border-right:3px solid {color};">'
-                 f'<img src="{_esc(logo)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;" alt="{company}" /></td>') if logo else ""
+                 f'<img src="{_esc(left_img)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;" alt="{company}" /></td>') if left_img else ""
+    logo_row = (f'<tr><td style="padding-bottom:8px;"><img src="{_esc(company_logo)}" width="{top_logo_w}" style="display:block;width:{top_logo_w}px;max-width:100%;border-radius:4px;" alt="{company}" /></td></tr>') if logo_in_identity else ""
     identity = (
-        f'<td style="vertical-align:top;padding-left:{"18px" if logo else "0"};">'
+        f'<td style="vertical-align:top;padding-left:{"18px" if left_img else "0"};">'
         f'<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
+        f'{logo_row}'
         f'<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:800;color:#0f172a;padding-bottom:2px;">{name}</td></tr>'
         + (f'<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:{color};padding-bottom:2px;">{title_line}</td></tr>' if title_line else "")
         + (f'<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:600;color:#0f172a;padding-bottom:6px;">{company}</td></tr>' if company else "")
@@ -584,7 +590,11 @@ def build_signature_html(user, s):
         if website:
             parts.append(f'<a href="{_esc(_norm_url(website))}" style="color:#1f2937;text-decoration:none;">{_esc(website)}</a>')
         contact_inline = ' &nbsp;<span style="color:#d1d5db;">·</span>&nbsp; '.join(parts)
-        logo_html = f'<img src="{_esc(logo)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;margin-bottom:8px;" alt="{company}" />' if logo else ""
+        logo_html = (
+            (f'<img src="{_esc(avatar)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;margin-bottom:8px;" alt="Photo" />' if avatar else "")
+            + (f'<img src="{_esc(company_logo)}" width="{top_logo_w}" style="display:block;width:{top_logo_w}px;max-width:100%;border-radius:4px;margin-bottom:8px;" alt="{company}" />' if logo_in_identity else "")
+            + (f'<img src="{_esc(company_logo)}" width="{logo_w}" style="display:block;width:{logo_w}px;border-radius:6px;margin-bottom:8px;" alt="{company}" />' if (not avatar and company_logo) else "")
+        )
         modern = (
             f'<td colspan="2" style="border-left:4px solid {color};padding:2px 0 2px 16px;">'
             f'{logo_html}'
