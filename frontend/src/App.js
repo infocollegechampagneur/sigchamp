@@ -11,6 +11,7 @@ import Employees from "@/pages/Employees";
 import EmailSender from "@/pages/EmailSender";
 import Analytics from "@/pages/Analytics";
 import M365Deploy from "@/pages/M365Deploy";
+import Install from "@/pages/Install";
 
 function Loading() {
   return (
@@ -49,6 +50,7 @@ function App() {
             <Route path="/app/email" element={<Protected adminOnly><EmailSender /></Protected>} />
             <Route path="/app/deploy" element={<Protected adminOnly><M365Deploy /></Protected>} />
             <Route path="/app/analytics" element={<Protected adminOnly><Analytics /></Protected>} />
+            <Route path="/app/install" element={<Protected adminOnly><Install /></Protected>} />
             <Route path="*" element={<Navigate to="/app/signature" replace />} />
           </Routes>
         </BrowserRouter>

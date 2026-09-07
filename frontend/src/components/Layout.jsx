@@ -1,7 +1,7 @@
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { PenLine, Palette, Images, Users, LogOut, Sparkles, Mail, BarChart3, Cloud } from "lucide-react";
+import { PenLine, Palette, Images, Users, LogOut, Sparkles, Mail, BarChart3, Cloud, Server } from "lucide-react";
 
 const navItems = [
   { to: "/app/signature", label: "Ma signature", icon: PenLine, testid: "nav-employee-portal", roles: ["admin", "employee"] },
@@ -11,6 +11,7 @@ const navItems = [
   { to: "/app/email", label: "Envois courriel", icon: Mail, testid: "nav-email", roles: ["admin"] },
   { to: "/app/deploy", label: "Déploiement M365", icon: Cloud, testid: "nav-deploy", roles: ["admin"] },
   { to: "/app/analytics", label: "Statistiques", icon: BarChart3, testid: "nav-analytics", roles: ["admin"] },
+  { to: "/app/install", label: "Installation", icon: Server, testid: "nav-install", roles: ["admin"] },
 ];
 
 export default function Layout({ children }) {
