@@ -1,7 +1,7 @@
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { PenLine, Palette, Images, Users, LogOut, Sparkles, Mail, BarChart3, Cloud, Server, Rocket, CloudCog, ServerCog } from "lucide-react";
+import { PenLine, Palette, Images, Users, LogOut, Sparkles, Mail, BarChart3, Cloud, Server, Rocket, CloudCog, ServerCog, HardDrive } from "lucide-react";
 
 const navItems = [
   { to: "/app/signature", label: "Ma signature", icon: PenLine, testid: "nav-employee-portal", roles: ["admin", "employee"] },
@@ -12,6 +12,7 @@ const navItems = [
   { to: "/app/email", label: "Envois courriel", icon: Mail, testid: "nav-email", roles: ["admin"] },
   { to: "/app/m365", label: "Microsoft 365", icon: CloudCog, testid: "nav-m365", roles: ["admin"] },
   { to: "/app/deploy", label: "Déploiement M365", icon: Cloud, testid: "nav-deploy", roles: ["admin"] },
+  { to: "/app/hosting", label: "Hébergement images", icon: HardDrive, testid: "nav-hosting", roles: ["admin"] },
   { to: "/app/analytics", label: "Statistiques", icon: BarChart3, testid: "nav-analytics", roles: ["admin"] },
   { to: "/app/install", label: "Installation", icon: Server, testid: "nav-install", roles: ["admin"] },
   { to: "/app/system", label: "Système", icon: ServerCog, testid: "nav-system", roles: ["admin"] },

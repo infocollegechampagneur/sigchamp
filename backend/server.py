@@ -8,6 +8,8 @@ load_dotenv(ROOT_DIR / '.env')
 import io
 import csv
 import uuid
+import ssl
+import ftplib
 import asyncio
 import secrets
 import logging
@@ -108,8 +110,81 @@ def put_object(path: str, data: bytes, content_type: str) -> dict:
         fp = _local_path(path)
         fp.parent.mkdir(parents=True, exist_ok=True)
         fp.write_bytes(data)
-        return {"path": path}
-    return _emergent_put(path, data, content_type)
+        res = {"path": path}
+    else:
+        res = _emergent_put(path, data, content_type)
+    # Publication automatique vers l'hébergement externe (ex. SiteGround) si activé.
+    if _assets_cache.get("enabled"):
+        try:
+            _ftp_upload(_assets_cache, path, data)
+        except Exception as e:
+            logger.error(f"Publication FTP échouée pour {path}: {e}")
+    return res
+
+
+# ---------------------------------------------------------------------------
+# Hébergement externe des images (FTP/FTPS) — pour des URLs toujours actives,
+# indépendantes du backend (ex. sous-domaine SiteGround en HTTPS).
+# ---------------------------------------------------------------------------
+_assets_cache: dict = {}
+
+
+async def refresh_assets_cache():
+    global _assets_cache
+    _assets_cache = await db.config.find_one({"key": "assets"}) or {}
+
+
+def _ftp_open(cfg: dict):
+    host = cfg["ftp_host"]; user = cfg["ftp_user"]; pwd = cfg.get("ftp_password", "")
+    if cfg.get("ftp_secure", True):
+        ftp = ftplib.FTP_TLS(context=ssl.create_default_context())
+        ftp.connect(host, int(cfg.get("ftp_port") or 21), timeout=30)
+        ftp.login(user, pwd)
+        ftp.prot_p()
+    else:
+        ftp = ftplib.FTP()
+        ftp.connect(host, int(cfg.get("ftp_port") or 21), timeout=30)
+        ftp.login(user, pwd)
+    return ftp
+
+
+def _ftp_makedirs(ftp, remote_dir: str):
+    parts = [p for p in remote_dir.split("/") if p]
+    cur = ""
+    for p in parts:
+        cur += "/" + p
+        try:
+            ftp.mkd(cur)
+        except Exception:
+            pass
+
+
+def _ftp_upload(cfg: dict, path: str, data: bytes):
+    base = (cfg.get("ftp_dir") or "").rstrip("/")
+    remote = f"{base}/{path}".lstrip("/") if base else path
+    remote = "/" + remote if not remote.startswith("/") else remote
+    ftp = _ftp_open(cfg)
+    try:
+        _ftp_makedirs(ftp, remote.rsplit("/", 1)[0])
+        ftp.storbinary(f"STOR {remote}", io.BytesIO(data))
+    finally:
+        try:
+            ftp.quit()
+        except Exception:
+            pass
+
+
+def _rewrite_asset_urls(html: str) -> str:
+    """Remplace les URLs d'images du backend par l'URL publique d'hébergement (toujours active)."""
+    cfg = _assets_cache
+    if not cfg.get("enabled") or not cfg.get("public_url"):
+        return html
+    pub = cfg["public_url"].rstrip("/")
+    bk = (BACKEND_PUBLIC_URL or "").rstrip("/")
+    if bk:
+        html = html.replace(f"{bk}/api/social-icons/", f"{pub}/social/")
+        html = html.replace(f"{bk}/api/files/", f"{pub}/")
+    return html
 
 
 def get_object(path: str):
@@ -702,7 +777,8 @@ def build_signature_html(user, s, include_style=True):
         rows.append(f'<tr><td colspan="2" style="padding-top:14px;"><div class="sf-disc sf-disc-line" style="border-top:1px solid #e5e7eb;padding-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:1.4;color:#9ca3af;max-width:600px;">{disclaimer}</div></td></tr>')
 
     style_block = _dark_style_block(_dark_accent_for(color)) if include_style else ""
-    return f'{style_block}<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">{"".join(rows)}</table>'
+    html = f'{style_block}<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">{"".join(rows)}</table>'
+    return _rewrite_asset_urls(html)
 
 
 def _signature_file(sig_html):
@@ -1624,6 +1700,96 @@ async def m365_remove(data: M365PushInput, admin: dict = Depends(require_admin))
     return {"removed": removed, "failed": failed, "removed_count": len(removed)}
 
 
+class AssetsConfig(BaseModel):
+    enabled: bool = False
+    public_url: Optional[str] = None
+    ftp_host: Optional[str] = None
+    ftp_port: Optional[int] = 21
+    ftp_user: Optional[str] = None
+    ftp_password: Optional[str] = None
+    ftp_dir: Optional[str] = None
+    ftp_secure: bool = True
+
+
+@api_router.get("/assets/config")
+async def get_assets_config(admin: dict = Depends(require_admin)):
+    cfg = await db.config.find_one({"key": "assets"}) or {}
+    return {"enabled": bool(cfg.get("enabled")), "public_url": cfg.get("public_url", ""),
+            "ftp_host": cfg.get("ftp_host", ""), "ftp_port": cfg.get("ftp_port", 21),
+            "ftp_user": cfg.get("ftp_user", ""), "ftp_dir": cfg.get("ftp_dir", ""),
+            "ftp_secure": bool(cfg.get("ftp_secure", True)), "has_password": bool(cfg.get("ftp_password"))}
+
+
+@api_router.put("/assets/config")
+async def put_assets_config(data: AssetsConfig, admin: dict = Depends(require_admin)):
+    existing = await db.config.find_one({"key": "assets"}) or {}
+    payload = {"key": "assets", "enabled": data.enabled,
+               "public_url": (data.public_url or "").strip().rstrip("/"),
+               "ftp_host": (data.ftp_host or "").strip(), "ftp_port": data.ftp_port or 21,
+               "ftp_user": (data.ftp_user or "").strip(), "ftp_dir": (data.ftp_dir or "").strip(),
+               "ftp_secure": data.ftp_secure}
+    if data.ftp_password:
+        payload["ftp_password"] = data.ftp_password
+    elif existing.get("ftp_password"):
+        payload["ftp_password"] = existing["ftp_password"]
+    await db.config.update_one({"key": "assets"}, {"$set": payload}, upsert=True)
+    await refresh_assets_cache()
+    return {"ok": True}
+
+
+@api_router.post("/assets/test")
+async def test_assets(admin: dict = Depends(require_admin)):
+    cfg = await db.config.find_one({"key": "assets"}) or {}
+    if not cfg.get("ftp_host") or not cfg.get("ftp_user"):
+        raise HTTPException(status_code=400, detail="Renseignez d'abord l'hôte et l'utilisateur FTP.")
+
+    def _run():
+        try:
+            data = b"SigChamp connexion OK"
+            _ftp_upload(cfg, f"{APP_NAME}/_sigchamp_test.txt", data)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    res = await asyncio.to_thread(_run)
+    if not res.get("ok"):
+        raise HTTPException(status_code=400, detail=f"Connexion FTP échouée : {res.get('error')}")
+    pub = (cfg.get("public_url") or "").rstrip("/")
+    return {"ok": True, "test_url": f"{pub}/{APP_NAME}/_sigchamp_test.txt" if pub else ""}
+
+
+@api_router.post("/assets/publish-all")
+async def publish_all_assets(admin: dict = Depends(require_admin)):
+    cfg = await db.config.find_one({"key": "assets"}) or {}
+    if not cfg.get("ftp_host"):
+        raise HTTPException(status_code=400, detail="Configurez d'abord l'hébergement FTP.")
+
+    def _run():
+        count, failed = 0, []
+        # 1) Tous les fichiers du stockage local (logos, GIF, avatars) en conservant les chemins.
+        if STORAGE_BACKEND == "local" and LOCAL_STORAGE_DIR.exists():
+            for fp in LOCAL_STORAGE_DIR.rglob("*"):
+                if fp.is_file():
+                    rel = str(fp.relative_to(LOCAL_STORAGE_DIR)).replace("\\", "/")
+                    try:
+                        _ftp_upload(cfg, rel, fp.read_bytes())
+                        count += 1
+                    except Exception as e:
+                        failed.append({"file": rel, "error": str(e)})
+        # 2) Icônes des réseaux sociaux → dossier social/.
+        social_dir = ASSETS_DIR / "social"
+        if social_dir.exists():
+            for fp in social_dir.glob("*.png"):
+                try:
+                    _ftp_upload(cfg, f"social/{fp.name}", fp.read_bytes())
+                    count += 1
+                except Exception as e:
+                    failed.append({"file": f"social/{fp.name}", "error": str(e)})
+        return {"published": count, "failed": failed}
+
+    return await asyncio.to_thread(_run)
+
+
 @api_router.get("/system/status")
 async def system_status(admin: dict = Depends(require_admin)):
     services = []
@@ -1706,6 +1872,7 @@ async def startup():
         await db.users.update_one({"email": admin_email},
                                   {"$set": {"password_hash": hash_password(admin_password)}})
     await load_settings()
+    await refresh_assets_cache()
 
 
 @app.on_event("shutdown")

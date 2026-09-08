@@ -15,6 +15,7 @@ import Install from "@/pages/Install";
 import SetupWizard from "@/pages/SetupWizard";
 import M365Connect from "@/pages/M365Connect";
 import SystemMaintenance from "@/pages/SystemMaintenance";
+import AssetHosting from "@/pages/AssetHosting";
 
 function Loading() {
   return (
@@ -57,6 +58,7 @@ function App() {
             <Route path="/app/setup" element={<Protected adminOnly><SetupWizard /></Protected>} />
             <Route path="/app/m365" element={<Protected adminOnly><M365Connect /></Protected>} />
             <Route path="/app/system" element={<Protected adminOnly><SystemMaintenance /></Protected>} />
+            <Route path="/app/hosting" element={<Protected adminOnly><AssetHosting /></Protected>} />
             <Route path="*" element={<Navigate to="/app/signature" replace />} />
           </Routes>
         </BrowserRouter>

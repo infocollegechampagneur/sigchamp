@@ -129,6 +129,13 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
 - **Vérifié** : navigateur émulé en dark → aperçu « Clair » affiche `.sf-name` en `rgb(15,23,42)` (foncé, lisible sur blanc).
 
 
+## Itération 17 — Hébergement externe des images (FTP/SiteGround, autonomie + toujours actif) (2026-06)
+- **Besoin** : solution gratuite où les images des signatures restent accessibles 24/7 même quand le backend dort. **Approche** : découpler les images vers l'hébergement du client (SiteGround, sous-domaine `sig.champagneur.qc.ca` HTTPS, toujours actif).
+- **Backend** (`server.py`) : couche de publication **FTP/FTPS** (`ftplib.FTP_TLS`) ; `put_object` publie automatiquement chaque fichier sur le FTP si activé ; `_rewrite_asset_urls()` remplace `{BACKEND}/api/files/` → `{public_url}/` et `{BACKEND}/api/social-icons/` → `{public_url}/social/` à la génération de la signature. Config en DB (`config.key="assets"`, mot de passe non exposé), cache module `_assets_cache` rafraîchi au démarrage + à chaque sauvegarde. Endpoints : `GET/PUT /api/assets/config`, `POST /api/assets/test`, `POST /api/assets/publish-all` (mirroir stockage local + icônes sociales vers le FTP).
+- **Frontend** : nouvelle page admin **« Hébergement images »** (`AssetHosting.jsx`, route `/app/hosting`, nav) : toggle, URL publique, hôte/port/user/pass FTP, dossier distant, FTPS, boutons Enregistrer / Tester / Publier. Vérifié (rendu OK, endpoints OK, réécriture d'URLs OK). Par défaut désactivé → comportement inchangé.
+- **Reco d'archi gratuite** : images → SiteGround (toujours actif) ; app → hébergement gratuit qui peut dormir ; MongoDB → Atlas gratuit. Total 0 $.
+
+
 ## Comptes de test
 - Admin : admin@sigflow.com / admin123
 - Employé exemple : employe@sigflow.com / employe123
