@@ -97,5 +97,12 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
 - P2 : statistiques de clics sur la bannière (tracking pixel).
 
 ## Comptes de test
+
+## Itération 13 — Signature nommée (fix « pas visible dans nouveau OWA ») (2026-06)
+- **Bug** : après push + roaming désactivé, la signature restait invisible dans OWA/Nouveau Outlook (paramètres → Rédiger et répondre). **Cause racine** : le push n'alimentait que le modèle *legacy* (`SignatureHtml`/`AutoAddSignature`). Le nouvel OWA/Outlook s'appuie sur les **signatures nommées** (`SignatureName` + `SignatureHtmlBody` + `DefaultSignature`) — sans nom ni défaut, la signature n'apparaît pas dans le sélecteur moderne (`SignatureName` et `DefaultSignature` étaient vides à la lecture Get-MailboxMessageConfiguration).
+- **Correctif** (`/api/m365/push`) : on définit désormais **les deux modèles** dans le même appel `Set-MailboxMessageConfiguration` — legacy (`SignatureHtml` + `SignatureText` + `AutoAddSignature*`) ET nommé (`SignatureName="SigChamp"`, `SignatureHtmlBody`, `DefaultSignature="SigChamp"`, `DefaultSignatureOnReply="SigChamp"`, `UseDefaultSignatureOnMobile`). Ajout du helper `_sig_plain_text`. `/api/m365/remove` nettoie aussi la signature nommée (`DeleteSignatureName`, `DefaultSignature=""`).
+- Vérifié en réel sur s.lynch : avant `SignatureName`/`DefaultSignature` vides → après = `SigChamp`. `applied_count=1`, roaming `postponed=true`. Rendu client OWA à confirmer par l'utilisateur (léger délai de synchro possible).
+
+## Comptes de test
 - Admin : admin@sigflow.com / admin123
 - Employé exemple : employe@sigflow.com / employe123

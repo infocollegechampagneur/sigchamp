@@ -1264,6 +1264,21 @@ def _graph_list_users(cfg: dict) -> list:
     return out
 
 
+def _sig_plain_text(user):
+    """Version texte brut de la signature (fallback pour messages en texte simple)."""
+    ext = user.get("phone_ext") or ""
+    lines = [
+        user.get("name") or "",
+        user.get("title") or "",
+        ("Poste " + ext) if ext else "",
+        user.get("direct_line") or "",
+        user.get("email") or "",
+    ]
+    txt = "\n".join(l for l in lines if l).strip()
+    return txt or (user.get("email") or " ")
+
+
+
 def _clean_ext(phones):
     if not phones:
         return ""
@@ -1390,6 +1405,65 @@ async def _iter_employee_emails():
         yield {"email": u.get("email", "")}
 
 
+class RoamingInput(BaseModel):
+    postpone: bool
+
+
+_sync_progress = {"running": False, "total": 0, "done": 0, "synced": 0, "failed": []}
+
+
+@api_router.get("/m365/roaming")
+async def m365_roaming_get(admin: dict = Depends(require_admin)):
+    cfg = await _m365_cfg()
+    r = await asyncio.to_thread(_exo_invoke, cfg, "Get-OrganizationConfig", {})
+    if r.status_code >= 300:
+        raise HTTPException(status_code=400, detail=_exo_error(r))
+    o = r.json().get("value", [{}])[0]
+    return {"postponed": bool(o.get("PostponeRoamingSignaturesUntilLater"))}
+
+
+@api_router.post("/m365/roaming")
+async def m365_roaming_set(data: RoamingInput, admin: dict = Depends(require_admin)):
+    cfg = await _m365_cfg()
+    r = await asyncio.to_thread(_exo_invoke, cfg, "Set-OrganizationConfig",
+                                {"PostponeRoamingSignaturesUntilLater": data.postpone})
+    if r.status_code >= 300:
+        raise HTTPException(status_code=400, detail=_exo_error(r))
+    return {"postponed": data.postpone}
+
+
+async def _run_sync(cfg: dict, emails: list):
+    _sync_progress.update({"running": True, "total": len(emails), "done": 0, "synced": 0, "failed": []})
+    for email in emails:
+        try:
+            fields = await asyncio.to_thread(_m365_provision_fields, cfg, email)
+            fields["m365_synced_at"] = datetime.now(timezone.utc).isoformat()
+            await db.users.update_one({"email": email}, {"$set": fields})
+            _sync_progress["synced"] += 1
+        except Exception as e:
+            _sync_progress["failed"].append({"email": email, "error": str(e)})
+        _sync_progress["done"] += 1
+    _sync_progress["running"] = False
+
+
+@api_router.post("/m365/sync")
+async def m365_sync(admin: dict = Depends(require_admin)):
+    if _sync_progress["running"]:
+        raise HTTPException(status_code=409, detail="Une synchronisation est déjà en cours.")
+    cfg = await _m365_cfg()
+    if not cfg.get("client_secret"):
+        raise HTTPException(status_code=400, detail="Microsoft 365 non configuré.")
+    linked = await db.users.find({"m365_linked": True}, {"email": 1}).to_list(5000)
+    emails = [(u.get("email") or "").lower() for u in linked if u.get("email")]
+    asyncio.create_task(_run_sync(cfg, emails))
+    return {"started": True, "total": len(emails)}
+
+
+@api_router.get("/m365/sync/status")
+async def m365_sync_status(admin: dict = Depends(require_admin)):
+    return _sync_progress
+
+
 @api_router.post("/m365/import")
 async def m365_import(data: M365PushInput, admin: dict = Depends(require_admin)):
     cfg = await _m365_cfg()
@@ -1416,27 +1490,6 @@ async def m365_import(data: M365PushInput, admin: dict = Depends(require_admin))
             failed.append({"email": email, "error": str(e)})
     return {"imported": imported, "updated": updated, "failed": failed,
             "imported_count": len(imported), "updated_count": len(updated)}
-
-
-@api_router.post("/m365/sync")
-async def m365_sync(admin: dict = Depends(require_admin)):
-    cfg = await _m365_cfg()
-    if not cfg.get("client_secret"):
-        raise HTTPException(status_code=400, detail="Microsoft 365 non configuré.")
-    linked = await db.users.find({"m365_linked": True}, {"email": 1}).to_list(2000)
-    synced, failed = [], []
-    for u in linked:
-        email = (u.get("email") or "").lower()
-        if not email:
-            continue
-        try:
-            fields = await asyncio.to_thread(_m365_provision_fields, cfg, email)
-            fields["m365_synced_at"] = datetime.now(timezone.utc).isoformat()
-            await db.users.update_one({"_id": u["_id"]}, {"$set": fields})
-            synced.append(email)
-        except Exception as e:
-            failed.append({"email": email, "error": str(e)})
-    return {"synced": synced, "failed": failed, "synced_count": len(synced)}
 
 
 @api_router.post("/m365/push")
@@ -1476,8 +1529,18 @@ async def m365_push(data: M365PushInput, admin: dict = Depends(require_admin)):
                 pass
             # Définir la vraie signature du compte (visible dans Outlook Web / Nouveau Outlook / Mobile,
             # et ajoutée automatiquement aux nouveaux courriels et réponses).
-            params = {"Identity": email, "SignatureHtml": html,
-                      "AutoAddSignature": True, "AutoAddSignatureOnReply": True, "AutoAddSignatureOnMobile": True}
+            # On alimente DEUX modèles pour couvrir tous les clients :
+            #  - Legacy (SignatureHtml/SignatureText) : utilisé par OWA/Nouveau Outlook quand le roaming est désactivé.
+            #  - Nommé/roaming (SignatureName + SignatureHtmlBody + DefaultSignature) : liste « Rédiger et répondre »
+            #    du nouvel Outlook/OWA moderne. Sans cela, la signature n'apparaît pas dans le sélecteur moderne.
+            sig_name = "SigChamp"
+            text = _sig_plain_text(user)
+            params = {"Identity": email,
+                      "SignatureHtml": html, "SignatureText": text,
+                      "AutoAddSignature": True, "AutoAddSignatureOnReply": True,
+                      "AutoAddSignatureOnMobile": True, "UseDefaultSignatureOnMobile": True,
+                      "SignatureName": sig_name, "SignatureHtmlBody": html,
+                      "DefaultSignature": sig_name, "DefaultSignatureOnReply": sig_name}
             r = await asyncio.to_thread(_exo_invoke, cfg, "Set-MailboxMessageConfiguration", params)
             if r.status_code < 300:
                 applied.append(email)
@@ -1540,8 +1603,11 @@ async def m365_remove(data: M365PushInput, admin: dict = Depends(require_admin))
         rule = f"SigChamp - {email}"
         try:
             # Effacer la signature du compte (Web / Nouveau Outlook / Mobile).
-            clear = {"Identity": email, "SignatureHtml": "",
-                     "AutoAddSignature": False, "AutoAddSignatureOnReply": False, "AutoAddSignatureOnMobile": False}
+            clear = {"Identity": email, "SignatureHtml": "", "SignatureText": " ",
+                     "AutoAddSignature": False, "AutoAddSignatureOnReply": False,
+                     "AutoAddSignatureOnMobile": False,
+                     "DefaultSignature": "", "DefaultSignatureOnReply": "",
+                     "DeleteSignatureName": "SigChamp"}
             r = await asyncio.to_thread(_exo_invoke, cfg, "Set-MailboxMessageConfiguration", clear)
             # Retirer aussi une éventuelle ancienne règle de flux (méthode précédente).
             try:

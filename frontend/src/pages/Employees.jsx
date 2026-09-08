@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { UserPlus, Trash2, Loader2, ShieldCheck, Upload, Download, FileUp, Pencil } from "lucide-react";
+import { UserPlus, Trash2, Loader2, ShieldCheck, Upload, Download, FileUp, Pencil, Send } from "lucide-react";
 
 const empty = { email: "", password: "", name: "", title: "", phone_ext: "", direct_line: "", department: "" };
 const emptyEdit = { name: "", title: "", department: "", phone_ext: "", direct_line: "", booking_url: "" };
@@ -27,6 +27,16 @@ export default function Employees() {
   const [editId, setEditId] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editSig, setEditSig] = useState("");
+  const [pushingId, setPushingId] = useState(null);
+
+  const pushSig = async (emp) => {
+    setPushingId(emp.id);
+    try {
+      const { data } = await api.post("/m365/push", { emails: [emp.email] });
+      if (data.applied_count) toast.success(`Signature poussée à ${emp.name || emp.email}.`);
+      else toast.error(data.failed?.[0]?.error || "Échec du push.", { duration: 12000 });
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); } finally { setPushingId(null); }
+  };
 
   const load = () => api.get("/employees").then((r) => setList(r.data));
   useEffect(() => { load(); }, []);
@@ -278,6 +288,9 @@ export default function Employees() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
+                    <button onClick={() => pushSig(emp)} disabled={pushingId === emp.id} data-testid={`button-push-employee-${emp.id}`} title="Pousser la signature dans Microsoft 365" className="p-2 text-slate-400 hover:text-blue-400 transition-colors disabled:opacity-50">
+                      {pushingId === emp.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    </button>
                     <button onClick={() => openEdit(emp)} data-testid={`button-edit-employee-${emp.id}`} className="p-2 text-slate-400 hover:text-blue-400 transition-colors">
                       <Pencil className="h-4 w-4" />
                     </button>

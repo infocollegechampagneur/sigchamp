@@ -19,8 +19,21 @@ export default function M365Connect() {
   const [testResult, setTestResult] = useState(null);
   const [lastErrors, setLastErrors] = useState([]);
   const [q, setQ] = useState("");
+  const [syncProgress, setSyncProgress] = useState(null);
+  const [roaming, setRoaming] = useState(null);
+  const [roamingBusy, setRoamingBusy] = useState(false);
 
   useEffect(() => { api.get("/m365/config").then((r) => setCfg((c) => ({ ...c, ...r.data, client_secret: "" }))); }, []);
+  useEffect(() => { api.get("/m365/roaming").then((r) => setRoaming(r.data.postponed)).catch(() => {}); }, []);
+
+  const setRoamingState = async (postpone) => {
+    setRoamingBusy(true);
+    try {
+      const { data } = await api.post("/m365/roaming", { postpone });
+      setRoaming(data.postponed);
+      toast.success(postpone ? "Signatures itinérantes désactivées — les signatures SigChamp seront visibles dans Outlook." : "Signatures itinérantes réactivées.");
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); } finally { setRoamingBusy(false); }
+  };
   const set = (k) => (e) => setCfg((c) => ({ ...c, [k]: e.target.value }));
 
   const save = async () => {
@@ -101,12 +114,24 @@ export default function M365Connect() {
   };
 
   const syncFiches = async () => {
-    setSyncing(true); setLastErrors([]);
+    setSyncing(true); setLastErrors([]); setSyncProgress({ done: 0, total: 0 });
     try {
       const { data } = await api.post("/m365/sync");
-      toast.success(`${data.synced_count} fiche(s) synchronisée(s) depuis Microsoft 365.`);
-      if (data.failed?.length) setLastErrors(data.failed);
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); } finally { setSyncing(false); }
+      setSyncProgress({ done: 0, total: data.total });
+      const poll = setInterval(async () => {
+        try {
+          const { data: st } = await api.get("/m365/sync/status");
+          setSyncProgress({ done: st.done, total: st.total });
+          if (!st.running) {
+            clearInterval(poll);
+            setSyncing(false);
+            if (st.failed?.length) setLastErrors(st.failed);
+            toast.success(`${st.synced} fiche(s) synchronisée(s) depuis Microsoft 365.`);
+            setTimeout(() => setSyncProgress(null), 4000);
+          }
+        } catch (e) { clearInterval(poll); setSyncing(false); }
+      }, 1500);
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); setSyncing(false); setSyncProgress(null); }
   };
 
   return (
@@ -169,6 +194,35 @@ export default function M365Connect() {
         </div>
       </div>
 
+      {/* Roaming signatures control */}
+      {roaming !== null && (
+        <div className={`rounded-2xl border p-5 sf-fade-up ${roaming ? "bg-emerald-500/5 border-emerald-500/30" : "bg-amber-500/5 border-amber-500/30"}`} data-testid="roaming-card">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-[240px]">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                {roaming ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-amber-400" />}
+                Signatures itinérantes (roaming)
+              </h3>
+              <p className="text-sm text-slate-400 mt-1.5">
+                {roaming
+                  ? "Désactivées ✅ — les signatures poussées par SigChamp s'affichent dans le Nouvel Outlook / Outlook Web / mobile."
+                  : "Activées ⚠️ — le Nouvel Outlook / OWA IGNORENT la signature définie par SigChamp. Désactivez-les pour que vos signatures soient visibles."}
+              </p>
+            </div>
+            <Button
+              onClick={() => setRoamingState(!roaming)}
+              disabled={roamingBusy}
+              data-testid="button-toggle-roaming"
+              variant="outline"
+              className={roaming ? "border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-700" : "border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"}
+            >
+              {roamingBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              {roaming ? "Réactiver le roaming" : "Désactiver les signatures itinérantes"}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Users */}
       <div className="rounded-2xl bg-[#111827] border border-slate-800 p-6 sf-fade-up">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -191,6 +245,18 @@ export default function M365Connect() {
             </Button>
           </div>
         </div>
+
+        {syncProgress && (
+          <div className="mb-4" data-testid="sync-progress">
+            <div className="flex justify-between text-xs text-slate-400 mb-1">
+              <span>Synchronisation en cours…</span>
+              <span>{syncProgress.done} / {syncProgress.total}</span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+              <div className="h-full bg-blue-500 transition-all" style={{ width: `${syncProgress.total ? (syncProgress.done / syncProgress.total) * 100 : 0}%` }} />
+            </div>
+          </div>
+        )}
 
         {lastErrors.length > 0 && (
           <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4" data-testid="m365-push-errors">

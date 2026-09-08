@@ -1,0 +1,23 @@
+{
+  "summary": "Verified the roaming-signatures BUG-FIX control plus two new features (per-employee Pousser button, background M365 sync with progress bar). Logged in as admin, opened /app/m365: roaming-card renders with 'Désactivées ✅' message and button-toggle-roaming visible ('Réactiver le roaming'). Toggled it → success toast 'Signatures itinérantes réactivées.' captured; toggled back → final state verified via API GET /api/m365/roaming = {postponed:true} (ending state = DISABLED as required). Clicked button-sync-fiches-m365: sync-progress bar appeared showing 'Synchronisation en cours… 1 / 1' (only 1 linked fiche = s.lynch), and GET /api/m365/sync/status confirmed {running:false,total:1,done:1,synced:1,failed:[]}. On /app/employees, s.lynch row shows M365 badge and button-push-employee-{id}; click produced toast 'Signature poussée à Simon Lynch.'",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Roaming-card copy is clear and uses correct semantics (Désactivées = safe state where SigChamp signatures are visible). Nice.",
+    "sync-progress bar disappears as soon as running=false; that's fine, but consider keeping a 'Terminé (N synced / M failed)' summary for a few seconds so admins have a visual confirmation without needing the toast."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (curl re-verified GET /api/m365/roaming and /api/m365/sync/status)", "frontend": "100%"},
+  "test_credentials": "informatique@champagneur.qc.ca / sig3713+",
+  "seed_data_creation": "None. Ending roaming state left at postponed=true (disabled) as required.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "M365 tenant has 1 linked fiche (s.lynch@champagneur.qc.ca). Roaming currently disabled (postponed=true) so pushed signatures are visible in New Outlook/OWA. button-push-employee-{id} works per-row on Employees page. Sync progress bar renders while background task runs and disappears when finished (~2-4s for 1 fiche).",
+  "rca of the issue": "Original bug: pushed signature not visible in Outlook because tenant had roaming signatures enabled (PostponeRoamingSignaturesUntilLater=False), causing New Outlook/OWA to ignore Set-MailboxMessageConfiguration output. Fix: exposed roaming state via GET/POST /api/m365/roaming and added roaming-card + toggle in UI; main agent already set postponed=true on the live tenant. Verified via API: {\"postponed\":true}."
+}
