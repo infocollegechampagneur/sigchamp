@@ -580,7 +580,7 @@ def _resolve_banner(user, s):
             "key": "Défaut", "layout": default_layout}
 
 
-def build_signature_html(user, s):
+def build_signature_html(user, s, include_style=True):
     color = s.get("primary_color") or "#2563EB"
     logo_w = int(s.get("logo_width") or 86)
     banner_w = int(s.get("banner_width") or 600)
@@ -701,7 +701,7 @@ def build_signature_html(user, s):
     if disclaimer:
         rows.append(f'<tr><td colspan="2" style="padding-top:14px;"><div class="sf-disc sf-disc-line" style="border-top:1px solid #e5e7eb;padding-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:1.4;color:#9ca3af;max-width:600px;">{disclaimer}</div></td></tr>')
 
-    style_block = _dark_style_block(_dark_accent_for(color))
+    style_block = _dark_style_block(_dark_accent_for(color)) if include_style else ""
     return f'{style_block}<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">{"".join(rows)}</table>'
 
 
@@ -1264,18 +1264,6 @@ def _graph_list_users(cfg: dict) -> list:
     return out
 
 
-def _sig_plain_text(user):
-    """Version texte brut de la signature (fallback pour messages en texte simple)."""
-    ext = user.get("phone_ext") or ""
-    lines = [
-        user.get("name") or "",
-        user.get("title") or "",
-        ("Poste " + ext) if ext else "",
-        user.get("direct_line") or "",
-        user.get("email") or "",
-    ]
-    txt = "\n".join(l for l in lines if l).strip()
-    return txt or (user.get("email") or " ")
 
 
 
@@ -1519,29 +1507,34 @@ async def m365_push(data: M365PushInput, admin: dict = Depends(require_admin)):
             "direct_line": emp.get("direct_line") or g.get("mobilePhone") or "",
             "booking_url": emp.get("booking_url") or "",
         }
-        html = build_signature_html(user, settings)
+        # Version compacte (sans bloc <style>) : les règles de flux Exchange suppriment le CSS
+        # <style> de toute façon et limitent la taille du disclaimer (~5000 caractères).
+        html = build_signature_html(user, settings, include_style=False)
         rule = f"SigChamp - {email}"
         try:
-            # Nettoyage : retirer l'ancienne règle de flux (méthode précédente) pour éviter une signature en double.
+            # Méthode : règle de flux Exchange (disclaimer serveur). La signature est ajoutée à
+            # CHAQUE courriel sortant, quel que soit le client (OWA, Nouveau Outlook, Classique, mobile),
+            # sans dépendre des signatures itinérantes (roaming) — que Microsoft n'expose par aucune API.
+            fb = data.fallback  # Wrap / Ignore / Reject
+            params = {"From": [email],
+                      "ApplyHtmlDisclaimerLocation": "Append",
+                      "ApplyHtmlDisclaimerText": html,
+                      "ApplyHtmlDisclaimerFallbackAction": fb}
+            exists = await asyncio.to_thread(_exo_invoke, cfg, "Get-TransportRule", {"Identity": rule})
+            if exists.status_code < 300 and (exists.json().get("value") or []):
+                r = await asyncio.to_thread(_exo_invoke, cfg, "Set-TransportRule", {"Identity": rule, **params})
+            else:
+                r = await asyncio.to_thread(_exo_invoke, cfg, "New-TransportRule", {"Name": rule, **params})
+            # Éviter tout doublon si la boîte repasse un jour en mode « legacy » : effacer la
+            # signature de compte éventuellement posée par une version précédente de SigChamp.
             try:
-                await asyncio.to_thread(_exo_invoke, cfg, "Remove-TransportRule", {"Identity": rule, "Confirm": False})
+                await asyncio.to_thread(_exo_invoke, cfg, "Set-MailboxMessageConfiguration",
+                                        {"Identity": email, "AutoAddSignature": False,
+                                         "AutoAddSignatureOnReply": False, "AutoAddSignatureOnMobile": False,
+                                         "DefaultSignature": "", "DefaultSignatureOnReply": "",
+                                         "DeleteSignatureName": "SigChamp"})
             except Exception:
                 pass
-            # Définir la vraie signature du compte (visible dans Outlook Web / Nouveau Outlook / Mobile,
-            # et ajoutée automatiquement aux nouveaux courriels et réponses).
-            # On alimente DEUX modèles pour couvrir tous les clients :
-            #  - Legacy (SignatureHtml/SignatureText) : utilisé par OWA/Nouveau Outlook quand le roaming est désactivé.
-            #  - Nommé/roaming (SignatureName + SignatureHtmlBody + DefaultSignature) : liste « Rédiger et répondre »
-            #    du nouvel Outlook/OWA moderne. Sans cela, la signature n'apparaît pas dans le sélecteur moderne.
-            sig_name = "SigChamp"
-            text = _sig_plain_text(user)
-            params = {"Identity": email,
-                      "SignatureHtml": html, "SignatureText": text,
-                      "AutoAddSignature": True, "AutoAddSignatureOnReply": True,
-                      "AutoAddSignatureOnMobile": True, "UseDefaultSignatureOnMobile": True,
-                      "SignatureName": sig_name, "SignatureHtmlBody": html,
-                      "DefaultSignature": sig_name, "DefaultSignatureOnReply": sig_name}
-            r = await asyncio.to_thread(_exo_invoke, cfg, "Set-MailboxMessageConfiguration", params)
             if r.status_code < 300:
                 applied.append(email)
                 if emp:
@@ -1602,16 +1595,16 @@ async def m365_remove(data: M365PushInput, admin: dict = Depends(require_admin))
             continue
         rule = f"SigChamp - {email}"
         try:
-            # Effacer la signature du compte (Web / Nouveau Outlook / Mobile).
-            clear = {"Identity": email, "SignatureHtml": "", "SignatureText": " ",
-                     "AutoAddSignature": False, "AutoAddSignatureOnReply": False,
-                     "AutoAddSignatureOnMobile": False,
-                     "DefaultSignature": "", "DefaultSignatureOnReply": "",
-                     "DeleteSignatureName": "SigChamp"}
-            r = await asyncio.to_thread(_exo_invoke, cfg, "Set-MailboxMessageConfiguration", clear)
-            # Retirer aussi une éventuelle ancienne règle de flux (méthode précédente).
+            # Action principale : retirer la règle de flux Exchange (signature serveur).
+            r = await asyncio.to_thread(_exo_invoke, cfg, "Remove-TransportRule", {"Identity": rule, "Confirm": False})
+            # Nettoyer aussi une éventuelle signature de compte posée par une ancienne version.
             try:
-                await asyncio.to_thread(_exo_invoke, cfg, "Remove-TransportRule", {"Identity": rule, "Confirm": False})
+                await asyncio.to_thread(_exo_invoke, cfg, "Set-MailboxMessageConfiguration",
+                                        {"Identity": email, "SignatureHtml": "", "SignatureText": " ",
+                                         "AutoAddSignature": False, "AutoAddSignatureOnReply": False,
+                                         "AutoAddSignatureOnMobile": False,
+                                         "DefaultSignature": "", "DefaultSignatureOnReply": "",
+                                         "DeleteSignatureName": "SigChamp"})
             except Exception:
                 pass
             low = "".join(ch for ch in r.text if ch.isprintable()).lower()
