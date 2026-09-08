@@ -1,16 +1,13 @@
 services:
   # ---------------------------------------------------------------------------
-  # Backend FastAPI — 100 % autonome (stockage local sur disque, sans Emergent)
+  # Backend FastAPI — 100 % gratuit et autonome
+  # (images hébergées ailleurs, ex. SiteGround → le disque local peut être éphémère)
   # ---------------------------------------------------------------------------
   - type: web
     name: sigchamp-backend
     runtime: docker
     dockerfilePath: ./Dockerfile.backend
-    plan: starter            # requis pour attacher un disque persistant (le plan free n'a pas de disque)
-    disk:
-      name: sigchamp-storage
-      mountPath: /data/storage
-      sizeGB: 1
+    plan: free               # gratuit (le service se met en veille après inactivité)
     envVars:
       - key: MONGO_URL
         sync: false          # collez votre chaîne de connexion MongoDB Atlas
@@ -21,23 +18,21 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: ADMIN_EMAIL
-        sync: false          # ex. informatique@votredomaine.com
+        sync: false          # ex. informatique@champagneur.qc.ca
       - key: ADMIN_PASSWORD
         sync: false
       # --- Stockage autonome (aucune dépendance Emergent) ---
       - key: STORAGE_BACKEND
         value: local
-      - key: LOCAL_STORAGE_DIR
-        value: /data/storage
       # --- Récupération auto des scripts M365 (optionnel) ---
       - key: DEPLOY_API_TOKEN
         generateValue: true
-      # URL publique du backend (indispensable : les images des signatures sont chargées via cette URL)
+      # URL publique de CE service backend (indispensable pour l'app)
       - key: REACT_APP_BACKEND_URL
-        sync: false          # = URL publique de CE service, ex. https://sigchamp-backend.onrender.com
+        sync: false          # ex. https://sigchamp-backend.onrender.com
 
   # ---------------------------------------------------------------------------
-  # Frontend React (build statique servi par nginx)
+  # Frontend React (servi par nginx)
   # ---------------------------------------------------------------------------
   - type: web
     name: sigchamp-frontend
