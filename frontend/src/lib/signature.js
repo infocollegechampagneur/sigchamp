@@ -34,9 +34,12 @@ export function darkAccentFor(primary) {
   return luminance(hexToRgb(primary)) < 0.55 ? lighten(primary, 0.6) : primary;
 }
 // Rules applied both for OS dark clients (@media) and the in-app preview (.sf-dark scope).
-function darkStyleBlock(accent) {
+// previewOnly=true → omit the global @media rule so it doesn't leak into the app page
+// (otherwise, when the user's browser is in dark mode, the "Clair" preview text turns white).
+function darkStyleBlock(accent, previewOnly = false) {
   const r = `.sf-name{color:#f8fafc!important}.sf-text{color:#e5e7eb!important}.sf-text a{color:#e5e7eb!important}.sf-muted{color:#9ca3af!important}.sf-disc{color:#94a3b8!important}.sf-disc-line{border-top-color:#334155!important}.sf-accent{color:${accent}!important}.sf-social{color:#e5e7eb!important}.sf-bar{border-right-color:${accent}!important}.sf-bar-left{border-left-color:${accent}!important}`;
   const scoped = r.replace(/\.sf-/g, ".sf-dark .sf-");
+  if (previewOnly) return `<style>${scoped}</style>`;
   return `<style>@media (prefers-color-scheme:dark){${r}}${scoped}</style>`;
 }
 
@@ -58,7 +61,7 @@ export function resolveBanner(user = {}, s = {}) {
   return { gif_url: s.gif_url || "", banner_link: s.banner_link || "", key: "Défaut", layout: defLayout };
 }
 
-export function buildSignatureHtml(user = {}, s = {}) {
+export function buildSignatureHtml(user = {}, s = {}, opts = {}) {
   const color = s.primary_color || "#2563EB";
   const logoW = Number(s.logo_width) || 86;
   const bannerW = Number(s.banner_width) || 600;
@@ -198,7 +201,7 @@ export function buildSignatureHtml(user = {}, s = {}) {
     rows.push(`<tr><td colspan="2" style="padding-top:14px;"><div class="sf-disc sf-disc-line" style="border-top:1px solid #e5e7eb;padding-top:8px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:1.4;color:#9ca3af;max-width:600px;">${disclaimer}</div></td></tr>`);
   }
 
-  const styleBlock = darkStyleBlock(darkAccentFor(color));
+  const styleBlock = darkStyleBlock(darkAccentFor(color), !!opts.preview);
   return `${styleBlock}<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;">${rows.join("")}</table>`;
 }
 

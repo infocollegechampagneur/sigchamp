@@ -147,7 +147,7 @@ export default function BrandAssets() {
               <div className="grid sm:grid-cols-2 gap-3 mt-4" data-testid="layout-compare">
                 {[{ id: "classic", label: "Classique" }, { id: "modern", label: "Moderne" }].map((opt) => {
                   const active = (s.signature_layout || "classic") === opt.id;
-                  const previewHtml = buildSignatureHtml(SAMPLE_EMPLOYEE, { ...s, signature_layout: opt.id, department_banners: [] });
+                  const previewHtml = buildSignatureHtml(SAMPLE_EMPLOYEE, { ...s, signature_layout: opt.id, department_banners: [] }, { preview: true });
                   return (
                     <div key={opt.id} className={`rounded-xl border overflow-hidden ${active ? "border-blue-500 ring-1 ring-blue-500/40" : "border-slate-700"}`} data-testid={`layout-card-${opt.id}`}>
                       <div className={`flex items-center justify-between px-3 py-2 text-xs font-semibold ${active ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>

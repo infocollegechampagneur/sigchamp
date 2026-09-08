@@ -10,6 +10,7 @@ export function SignaturePreview({ user, settings }) {
   const [device, setDevice] = useState("desktop");
   const [guideOpen, setGuideOpen] = useState(false);
   const html = buildSignatureHtml(user, settings);
+  const previewHtml = buildSignatureHtml(user, settings, { preview: true });
 
   const copyRich = async () => {
     try {
@@ -88,7 +89,7 @@ export function SignaturePreview({ user, settings }) {
               </div>
               <div className="px-3 py-3">
                 <p className={`text-[11px] mb-3 ${dark ? "text-slate-300" : "text-slate-600"}`}>Bonjour,<br />Merci de votre temps. Cordialement,</p>
-                <div className={`signature-render${dark ? " sf-dark" : ""}`} style={{ zoom: 0.5 }} dangerouslySetInnerHTML={{ __html: html }} />
+                <div className={`signature-render${dark ? " sf-dark" : ""}`} style={{ zoom: 0.5 }} dangerouslySetInnerHTML={{ __html: previewHtml }} />
               </div>
             </div>
             <div className="h-6 bg-slate-900 flex items-center justify-center">
@@ -116,7 +117,7 @@ export function SignaturePreview({ user, settings }) {
               <p className={`text-sm mb-6 ${dark ? "text-slate-300" : "text-slate-600"}`}>
                 Bonjour,<br />Merci de votre temps aujourd'hui. Cordialement,
               </p>
-              <div className={`signature-render${dark ? " sf-dark" : ""}`} dangerouslySetInnerHTML={{ __html: html }} />
+              <div className={`signature-render${dark ? " sf-dark" : ""}`} dangerouslySetInnerHTML={{ __html: previewHtml }} />
             </div>
           </div>
         </div>

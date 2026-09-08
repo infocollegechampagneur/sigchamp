@@ -115,6 +115,20 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
 - Vérifié : aperçu live affiche « Technicien en informatique » (desktop + mobile 390px OK).
 
 
+## Itération 15 — Saut de ligne + déploiement autonome Render/GitHub (2026-06)
+- **Saut de ligne** : le push (règle de flux) préfixe désormais la signature d'un espace (`<div style="height:18px">`) pour que le texte du message ne colle pas à la signature. Re-poussé/vérifié.
+- **Déploiement autonome (sans Emergent)** : `STORAGE_BACKEND` par défaut = `emergent` dans le code → **il faut `STORAGE_BACKEND=local`** pour un hébergement sans Emergent (stockage disque via `LOCAL_STORAGE_DIR`, servi par `/api/files`). Aucune fonction n'appelle Emergent en mode local ; `EMERGENT_LLM_KEY`/`INTEGRATION_PROXY_URL` inutiles.
+- `render.yaml` **réécrit** : services `sigchamp-backend`/`sigchamp-frontend`, `STORAGE_BACKEND=local` + `LOCAL_STORAGE_DIR=/data/storage` + **disque persistant 1 Go** (plan starter), `JWT_SECRET`/`DEPLOY_API_TOKEN` auto-générés, plus de variables Emergent.
+- `DEPLOYMENT.md` mis à jour (tableau env, note stockage autonome, Option D Render pas-à-pas, section « Ajouter manuellement dans GitHub »).
+- **Sécurité** : `.gitignore` protège désormais `.env`/`*/.env` (garde `.env.example`) ; `backend/.env` **retiré du suivi Git** (`git rm --cached`, fichier conservé sur disque) pour éviter toute fuite de secrets au push.
+
+
+## Itération 16 — Fix signature invisible sur fond clair (OS en mode sombre) (2026-06)
+- **Bug** : sur fond clair, la signature (aperçu in-app) devenait illisible ; en sombre, OK. **Cause racine** : `buildSignatureHtml` (frontend) injectait un bloc `<style>` avec une règle **globale** `@media (prefers-color-scheme:dark){ .sf-name{color:#f8fafc!important} … }`. Quand le **navigateur/OS de l'utilisateur est en mode sombre**, cette règle non scopée blanchissait TOUT le texte `.sf-*` de la page, y compris l'aperçu « Clair » sur fond blanc → texte blanc invisible. Indépendant des changements récents (dépend du thème système).
+- **Correctif** (`frontend/src/lib/signature.js`) : `darkStyleBlock(accent, previewOnly)` + `buildSignatureHtml(user, s, opts)` ; en mode `preview` on n'émet QUE les règles scopées `.sf-dark` (pilotées par le bouton Clair/Sombre), sans le `@media` global. `SignaturePreview.jsx` rend `previewHtml` (preview) mais garde `html` complet pour copier/code source/télécharger (vrai Outlook conserve le dark-mode `@media`). `BrandAssets.jsx` (vignettes) passe aussi `{ preview: true }`.
+- **Vérifié** : navigateur émulé en dark → aperçu « Clair » affiche `.sf-name` en `rgb(15,23,42)` (foncé, lisible sur blanc).
+
+
 ## Comptes de test
 - Admin : admin@sigflow.com / admin123
 - Employé exemple : employe@sigflow.com / employe123

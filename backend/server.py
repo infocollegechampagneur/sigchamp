@@ -1509,7 +1509,8 @@ async def m365_push(data: M365PushInput, admin: dict = Depends(require_admin)):
         }
         # Version compacte (sans bloc <style>) : les règles de flux Exchange suppriment le CSS
         # <style> de toute façon et limitent la taille du disclaimer (~5000 caractères).
-        html = build_signature_html(user, settings, include_style=False)
+        # Espace en tête pour que la signature ne colle pas au texte du message (règle de flux = ajout direct).
+        html = '<div style="height:18px;line-height:18px;">&nbsp;</div>' + build_signature_html(user, settings, include_style=False)
         rule = f"SigChamp - {email}"
         try:
             # Méthode : règle de flux Exchange (disclaimer serveur). La signature est ajoutée à

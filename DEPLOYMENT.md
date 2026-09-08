@@ -19,7 +19,9 @@ L'appli fonctionne partout : **Docker** (recommandé, identique sur Windows Serv
 | `CORS_ORIGINS` | Origines autorisées (`*` ou l'URL du frontend) |
 | `JWT_SECRET` | Chaîne aléatoire (64 caractères hex) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Compte admin créé au démarrage |
-| `EMERGENT_LLM_KEY` + `INTEGRATION_PROXY_URL` | Stockage des images/GIF (fournis par Emergent) |
+| `STORAGE_BACKEND` | `local` (recommandé, **autonome**, stockage sur disque) ou `emergent`. Par défaut `emergent` — **mettez `local` pour un hébergement sans Emergent**. |
+| `LOCAL_STORAGE_DIR` | Dossier disque où sont stockés logos/GIF/avatars (ex. `/data/storage`). À placer sur un **disque persistant**. |
+| `EMERGENT_LLM_KEY` + `INTEGRATION_PROXY_URL` | **Optionnels** — nécessaires uniquement si `STORAGE_BACKEND=emergent`. Laissez vides pour un hébergement autonome. |
 | `REACT_APP_BACKEND_URL` | URL **publique** du backend — utilisée pour les URLs d'images intégrées dans les signatures. **Indispensable** pour que les images s'affichent dans Outlook. |
 
 **Frontend** (`frontend/.env`) :
@@ -27,7 +29,7 @@ L'appli fonctionne partout : **Docker** (recommandé, identique sur Windows Serv
 |---|---|
 | `REACT_APP_BACKEND_URL` | URL publique du backend (ex. `https://signatures.mon-entreprise.com`) |
 
-> ⚠️ Le stockage d'images (logos, GIF) utilise le service Emergent. Pour un hébergement 100 % autonome sans Emergent, il faudrait remplacer les fonctions `put_object`/`get_object` de `backend/server.py` par un stockage local ou S3.
+> ✅ **Hébergement 100 % autonome (sans Emergent)** : mettez `STORAGE_BACKEND=local`. Logos, GIF et avatars sont alors stockés sur le disque du serveur (`LOCAL_STORAGE_DIR`) et servis via `/api/files/...`. Aucune clé Emergent n'est requise et aucune fonction n'appelle Emergent. Placez `LOCAL_STORAGE_DIR` sur un **disque/volume persistant** pour que les images survivent aux redémarrages.
 
 ---
 
@@ -120,17 +122,45 @@ WantedBy=multi-user.target
 
 ---
 
-## Option D — GitHub + Render
+## Option D — GitHub + Render (autonome, sans Emergent)
 
-1. Poussez le projet sur GitHub.
-2. Base de données : créez un cluster gratuit **MongoDB Atlas** et récupérez l'`MONGO_URL`.
-3. Sur Render → **New → Blueprint**, sélectionnez le dépôt. Render lit `render.yaml` et crée 2 services web (backend + frontend).
+Le fichier `render.yaml` fourni est déjà configuré pour un déploiement **autonome** : `STORAGE_BACKEND=local` + disque persistant, **aucune clé Emergent**.
+
+1. Poussez le projet sur GitHub (voir « Ajouter manuellement dans GitHub » plus bas).
+2. **Base de données** : créez un cluster gratuit **MongoDB Atlas**, créez un utilisateur, autorisez l'accès réseau (`0.0.0.0/0`), et copiez la chaîne `MONGO_URL` (format `mongodb+srv://user:pass@cluster.xxx.mongodb.net/`).
+3. Sur Render → **New → Blueprint**, sélectionnez votre dépôt GitHub. Render lit `render.yaml` et crée 2 services (`sigchamp-backend` + `sigchamp-frontend`) et un disque persistant de 1 Go.
 4. Renseignez les variables marquées `sync: false` :
-   - Backend : `MONGO_URL` (Atlas), `ADMIN_PASSWORD`, `EMERGENT_LLM_KEY`, `INTEGRATION_PROXY_URL`, et `REACT_APP_BACKEND_URL` = URL publique du backend Render.
-   - Frontend : `REACT_APP_BACKEND_URL` = URL publique du backend Render.
-5. Déployez. Le frontend sera servi sur son URL Render, le backend sur la sienne.
+   - **Backend** : `MONGO_URL` (Atlas), `ADMIN_EMAIL`, `ADMIN_PASSWORD`. `JWT_SECRET` et `DEPLOY_API_TOKEN` sont générés automatiquement.
+   - Laissez `REACT_APP_BACKEND_URL` vide au premier déploiement (voir étape 6).
+5. Lancez le déploiement du **backend** d'abord. Une fois en ligne, copiez son URL publique (ex. `https://sigchamp-backend.onrender.com`).
+6. Renseignez `REACT_APP_BACKEND_URL` = cette URL **dans les DEUX services** (backend et frontend), puis **redéployez** le backend et le frontend (le frontend fige cette URL au build).
+7. Ouvrez l'URL du frontend et connectez-vous avec `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 
-> Astuce : sur Render, l'URL du backend n'est connue qu'après la première création. Créez le backend, copiez son URL, puis renseignez-la dans `REACT_APP_BACKEND_URL` (backend + frontend) et redéployez le frontend.
+> ℹ️ Le **disque persistant** nécessite un plan payant Render (Starter) sur le backend. Sans disque (plan free), les logos/GIF téléversés sont perdus à chaque redéploiement. La base MongoDB (Atlas) et les configurations restent, elles, intactes.
+
+> ℹ️ Aucune variable `EMERGENT_LLM_KEY` / `INTEGRATION_PROXY_URL` n'est nécessaire : l'application n'appelle jamais Emergent quand `STORAGE_BACKEND=local`.
+
+---
+
+## Ajouter manuellement dans GitHub
+
+Poussez **tout le dépôt tel quel**. Fichiers/dossiers indispensables présents à la racine :
+- `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `docker-compose.yml`, `render.yaml`, `.env.example`
+- `backend/` (dont `requirements.txt`, `server.py`, `assets/social/`) et `frontend/` (dont `package.json`, `yarn.lock`, `src/`)
+
+À faire manuellement :
+1. **Ne poussez PAS vos secrets** : vérifiez que `backend/.env` et `frontend/.env` sont ignorés (ajoutez-les au `.gitignore`). Les vraies valeurs se renseignent dans Render (variables d'environnement), pas dans Git.
+2. Commandes (depuis la racine du projet) :
+   ```bash
+   git init
+   git add .
+   git commit -m "SigChamp - déploiement initial"
+   git branch -M main
+   git remote add origin https://github.com/VOTRE_COMPTE/sigchamp.git
+   git push -u origin main
+   ```
+   > Sur la plateforme Emergent, utilisez plutôt le bouton **« Save to GitHub »** du chat pour pousser automatiquement.
+3. Sur GitHub, aucune configuration supplémentaire n'est requise : c'est Render qui lit `render.yaml`.
 
 ---
 
