@@ -105,6 +105,16 @@ Fichiers ajoutés : `Dockerfile.backend`, `Dockerfile.frontend`, `nginx.conf`, `
 - **Limite de taille des disclaimers (~5000 car.)** : `build_signature_html(..., include_style=False)` génère une version **compacte sans bloc `<style>`** (le CSS dark-mode `<style>` est de toute façon supprimé par les règles de flux). Passe de 5258 → 4301 car. (New-TransportRule échouait avec « Invalid Operation » à cause du dépassement).
 - **Vérifié en réel sur s.lynch** : `applied_count=1` ; `Get-TransportRule` → règle **Enabled/Enforce**, action Append disclaimer ; signature de compte nettoyée (AutoAddSignature=False). Push idempotent (branche Set-TransportRule). ⚠️ Test final (envoi réel) à faire par l'utilisateur — une règle de flux met généralement quelques minutes à s'activer.
 
+## Itération 14 — Poste affiché + aperçu live + re-push auto (2026-06)
+- **Symptôme utilisateur** : après avoir ajouté le poste (« Technicien en informatique ») dans la fiche s.lynch, il n'apparaissait « ni dans l'aperçu ni dans le courriel ».
+- **Diagnostic** : le poste **était** bien enregistré (DB) et **présent** dans la signature générée ET dans la règle de flux. Deux causes de confusion : (1) la vignette du dialogue montrait la signature **importée** de M365 (lecture seule, ancienne, sans poste) ; (2) **modifier la fiche ne re-poussait pas** la règle de flux → le courriel gardait l'ancienne version tant qu'on ne re-poussait pas.
+- **Correctifs frontend** (`Employees.jsx`) :
+  - Ajout d'un **aperçu SigChamp en direct** (« ce qui sera poussé », composant `SignaturePreview` + `/settings`) qui reflète les modifications en temps réel (poste visible immédiatement). L'ancienne vignette importée est conservée en dessous, clairement libellée.
+  - **Re-push automatique** après « Enregistrer » si la fiche avait déjà été poussée (`m365_pushed_at`) → le courriel reste synchronisé sans action supplémentaire (toast dédié).
+  - Dialogue rendu défilable (`max-h-[88vh] overflow-y-auto`).
+- Vérifié : aperçu live affiche « Technicien en informatique » (desktop + mobile 390px OK).
+
+
 ## Comptes de test
 - Admin : admin@sigflow.com / admin123
 - Employé exemple : employe@sigflow.com / employe123

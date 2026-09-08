@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { UserPlus, Trash2, Loader2, ShieldCheck, Upload, Download, FileUp, Pencil, Send } from "lucide-react";
+import { SignaturePreview } from "@/components/SignaturePreview";
 
 const empty = { email: "", password: "", name: "", title: "", phone_ext: "", direct_line: "", department: "" };
 const emptyEdit = { name: "", title: "", department: "", phone_ext: "", direct_line: "", booking_url: "" };
@@ -27,6 +28,8 @@ export default function Employees() {
   const [editId, setEditId] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editSig, setEditSig] = useState("");
+  const [editEmp, setEditEmp] = useState(null);
+  const [settings, setSettings] = useState(null);
   const [pushingId, setPushingId] = useState(null);
 
   const pushSig = async (emp) => {
@@ -39,13 +42,14 @@ export default function Employees() {
   };
 
   const load = () => api.get("/employees").then((r) => setList(r.data));
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); api.get("/settings").then((r) => setSettings(r.data)).catch(() => {}); }, []);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const setEdit = (k) => (e) => setEditForm((f) => ({ ...f, [k]: e.target.value }));
 
   const openEdit = (emp) => {
     setEditId(emp.id);
+    setEditEmp(emp);
     setEditForm({
       name: emp.name || "", title: emp.title || "", department: emp.department || "",
       phone_ext: emp.phone_ext || "", direct_line: emp.direct_line || "", booking_url: emp.booking_url || "",
@@ -58,7 +62,19 @@ export default function Employees() {
     setSavingEdit(true);
     try {
       await api.put(`/employees/${editId}`, editForm);
-      toast.success("Fiche mise à jour.");
+      // Si la signature avait déjà été poussée, on re-pousse pour garder le courriel à jour.
+      const wasPushed = editEmp && editEmp.m365_pushed_at;
+      if (wasPushed && editEmp.email) {
+        try {
+          const { data } = await api.post("/m365/push", { emails: [editEmp.email] });
+          if (data.applied_count) toast.success("Fiche mise à jour et signature re-poussée à Microsoft 365.");
+          else toast.warning("Fiche enregistrée, mais le re-push a échoué : " + (data.failed?.[0]?.error || "erreur"), { duration: 12000 });
+        } catch {
+          toast.warning("Fiche enregistrée, mais le re-push a échoué. Poussez à nouveau depuis la fiche.");
+        }
+      } else {
+        toast.success("Fiche mise à jour.");
+      }
       setEditOpen(false);
       load();
     } catch (e) {
@@ -308,7 +324,7 @@ export default function Employees() {
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="bg-[#111827] border-slate-700 text-slate-100 max-w-lg" data-testid="edit-employee-dialog">
+        <DialogContent className="bg-[#111827] border-slate-700 text-slate-100 max-w-lg max-h-[88vh] overflow-y-auto" data-testid="edit-employee-dialog">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">Modifier la fiche</DialogTitle>
             <DialogDescription className="text-slate-400">Ces valeurs sont prioritaires sur Microsoft 365 lors du push.</DialogDescription>
@@ -338,6 +354,22 @@ export default function Employees() {
               <Label className="text-slate-300">Lien « Réserver une réunion » (Bookings)</Label>
               <Input data-testid="edit-emp-booking" value={editForm.booking_url} onChange={setEdit("booking_url")} placeholder="https://outlook.office.com/bookwithme/user/…" className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
             </div>
+            {settings && (
+              <div className="sm:col-span-2">
+                <Label className="text-slate-300">Aperçu SigChamp (ce qui sera poussé)</Label>
+                <div data-testid="edit-emp-sigchamp-preview" className="mt-1.5 rounded-lg border border-blue-700/50 bg-white p-3 max-h-60 overflow-auto">
+                  <SignaturePreview
+                    user={{
+                      ...(editEmp || {}),
+                      name: editForm.name, title: editForm.title, department: editForm.department,
+                      phone_ext: editForm.phone_ext, direct_line: editForm.direct_line, booking_url: editForm.booking_url,
+                    }}
+                    settings={settings}
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-1.5">Aperçu en direct reflétant vos modifications. En cliquant « Enregistrer », si cette signature a déjà été poussée, elle sera automatiquement re-poussée.</p>
+              </div>
+            )}
             {editSig && (
               <div className="sm:col-span-2">
                 <Label className="text-slate-300">Signature actuelle dans Outlook (importée de M365)</Label>
