@@ -1,0 +1,343 @@
+import React, { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { api } from "@/lib/apiClient";
+import { useAuth } from "@/context/AuthContext";
+import { SignaturePreview } from "@/components/SignaturePreview";
+import { RichTextEditor } from "@/components/RichTextEditor";
+import { DEFAULT_DISCLAIMER, buildSignatureHtml, TYPO_GROUPS, FONT_OPTIONS } from "@/lib/signature";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Upload, Save, Loader2, Linkedin, Twitter, Facebook, Instagram, Youtube, Music2 } from "lucide-react";
+
+const SAMPLE_EMPLOYEE = {
+  name: "Sophie Roy", title: "Responsable Marketing", department: "Marketing",
+  email: "sophie.roy@entreprise.com", phone_ext: "212", direct_line: "514 555-0143", avatar_url: "",
+};
+
+const TYPO_UI_DEFAULTS = {
+  name: { font: "Arial", size: 18, color: "#0f172a" },
+  title: { font: "Arial", size: 13, color: "#2563EB" },
+  contact: { font: "Arial", size: 13, color: "#1f2937" },
+  tel: { font: "Arial", size: 13, color: "#1f2937" },
+  direct: { font: "Arial", size: 13, color: "#1f2937" },
+  courriel: { font: "Arial", size: 13, color: "#1f2937" },
+  website: { font: "Arial", size: 13, color: "#1f2937" },
+  address: { font: "Arial", size: 12, color: "#6b7280" },
+};
+
+export default function BrandAssets() {
+  const { user } = useAuth();
+  const [s, setS] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [rteRev, setRteRev] = useState(0);
+
+  useEffect(() => { api.get("/settings").then((r) => setS(r.data)); }, []);
+
+  const set = (k) => (e) => setS((prev) => ({ ...prev, [k]: e.target.value }));
+  const setSocial = (k) => (e) => setS((prev) => ({ ...prev, social: { ...prev.social, [k]: e.target.value } }));
+  const tv = (group, field) => (s?.typography?.[group]?.[field]);
+  const setTypo = (group, field, value) => setS((prev) => ({
+    ...prev,
+    typography: { ...(prev.typography || {}), [group]: { ...((prev.typography || {})[group] || {}), [field]: value } },
+  }));
+
+  const uploadLogo = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const { data } = await api.post("/upload", fd);
+      setS((prev) => ({ ...prev, logo_url: data.url }));
+      toast.success("Logo téléversé.");
+    } catch {
+      toast.error("Échec du téléversement.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const { data } = await api.put("/settings", s);
+      setS(data);
+      toast.success("Charte graphique enregistrée pour toute l'entreprise.");
+    } catch {
+      toast.error("Échec de l'enregistrement.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!s) return <div className="p-8 text-slate-400">Chargement…</div>;
+
+  const socials = [
+    { key: "linkedin", icon: Linkedin, ph: "linkedin.com/company/…" },
+    { key: "twitter", icon: Twitter, ph: "x.com/…" },
+    { key: "facebook", icon: Facebook, ph: "facebook.com/…" },
+    { key: "instagram", icon: Instagram, ph: "instagram.com/…" },
+    { key: "youtube", icon: Youtube, ph: "youtube.com/@…" },
+    { key: "tiktok", icon: Music2, ph: "tiktok.com/@…" },
+  ];
+
+  return (
+    <div className="max-w-6xl mx-auto px-5 lg:px-8 py-8">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-blue-400">Administration</p>
+          <h1 className="font-display text-3xl lg:text-4xl font-extrabold text-white mt-1">Charte graphique</h1>
+          <p className="text-slate-400 mt-2">Éléments partagés appliqués à la signature de tous les employés.</p>
+        </div>
+        <Button onClick={save} disabled={saving} data-testid="button-save-brand-assets" className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6">
+          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+          Enregistrer pour tous
+        </Button>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-8">
+        <div className="space-y-5 sf-fade-up">
+          {/* Company + logo */}
+          <div className="rounded-2xl bg-[#111827] border border-slate-800 p-6">
+            <h3 className="font-semibold text-white mb-5">Entreprise & logo</h3>
+            <div className="flex items-center gap-4 mb-5">
+              <div className="h-16 w-16 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center">
+                {s.logo_url ? <img src={s.logo_url} alt="logo" className="h-full w-full object-cover" /> : <span className="text-slate-600 text-xs">Logo</span>}
+              </div>
+              <div>
+                <input id="logo-input" type="file" accept="image/*" className="hidden" onChange={uploadLogo} data-testid="button-upload-logo" />
+                <Button variant="outline" onClick={() => document.getElementById("logo-input").click()} disabled={uploading} className="border-slate-700 bg-slate-800/50 text-slate-200 hover:bg-slate-700 hover:text-white">
+                  {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />} Téléverser le logo
+                </Button>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-slate-300">Nom de l'entreprise</Label>
+                <Input data-testid="input-company-name" value={s.company_name} onChange={set("company_name")} className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+              </div>
+              <div>
+                <Label className="text-slate-300">Site web</Label>
+                <Input data-testid="input-company-website" value={s.website} onChange={set("website")} placeholder="entreprise.com" className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+              </div>
+              <div>
+                <Label className="text-slate-300">Téléphone principal</Label>
+                <Input data-testid="input-company-phone" value={s.phone_main} onChange={set("phone_main")} placeholder="514 555-0100" className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+              </div>
+              <div>
+                <Label className="text-slate-300">Couleur d'accent</Label>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <input type="color" value={s.primary_color} onChange={set("primary_color")} data-testid="input-primary-color" className="h-10 w-14 rounded-lg bg-slate-800/60 border border-slate-700 cursor-pointer" />
+                  <Input value={s.primary_color} onChange={set("primary_color")} className="bg-slate-800/60 border-slate-700 text-white font-mono" />
+                </div>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4 mt-4">
+              <div>
+                <div className="flex justify-between"><Label className="text-slate-300">Taille du logo</Label><span className="text-xs font-mono text-blue-400">{s.logo_width || 86}px</span></div>
+                <Slider value={[s.logo_width || 86]} min={40} max={160} step={2} onValueChange={(v) => setS((p) => ({ ...p, logo_width: v[0] }))} className="mt-3" data-testid="slider-logo-width" />
+              </div>
+              <div>
+                <div className="flex justify-between"><Label className="text-slate-300">Largeur de la bannière</Label><span className="text-xs font-mono text-blue-400">{s.banner_width || 600}px</span></div>
+                <Slider value={[s.banner_width || 600]} min={200} max={600} step={10} onValueChange={(v) => setS((p) => ({ ...p, banner_width: v[0] }))} className="mt-3" data-testid="slider-banner-width" />
+              </div>
+            </div>
+            <div className="mt-4 rounded-xl border border-slate-700 bg-slate-800/40 px-4 py-3" data-testid="name-top-border-row">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-slate-300 text-sm">Barre au-dessus du nom</Label>
+                  <p className="text-xs text-slate-500 mt-1">Affiche un filet horizontal juste avant le nom complet.</p>
+                </div>
+                <Switch data-testid="toggle-name-top-border" checked={!!s.name_top_border} onCheckedChange={(v) => setS((p) => ({ ...p, name_top_border: v }))} />
+              </div>
+              {s.name_top_border && (
+                <div className="grid sm:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <Label className="text-slate-300 text-xs">Couleur du filet</Label>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <input type="color" data-testid="name-border-color" value={s.name_top_border_color || "#111827"} onChange={(e) => setS((p) => ({ ...p, name_top_border_color: e.target.value }))} className="h-9 w-12 rounded border border-slate-700 bg-transparent cursor-pointer" />
+                      <Input value={s.name_top_border_color || "#111827"} onChange={(e) => setS((p) => ({ ...p, name_top_border_color: e.target.value }))} className="bg-slate-800/60 border-slate-700 text-white h-9" />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between"><Label className="text-slate-300 text-xs">Épaisseur du filet</Label><span className="text-xs font-mono text-blue-400">{s.name_top_border_width || 2}px</span></div>
+                    <Slider value={[s.name_top_border_width || 2]} min={1} max={8} step={1} onValueChange={(v) => setS((p) => ({ ...p, name_top_border_width: v[0] }))} className="mt-3" data-testid="slider-name-border-width" />
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mt-4">
+              <Label className="text-slate-300">Position du logo dans la signature</Label>
+              <select
+                data-testid="select-logo-position"
+                value={s.logo_position || "left"}
+                onChange={set("logo_position")}
+                className="mt-1.5 w-full h-10 rounded-md bg-slate-800/60 border border-slate-700 text-white px-3 text-sm"
+              >
+                <option value="left">À gauche du texte (par défaut)</option>
+                <option value="above_name">Au-dessus du nom complet</option>
+                <option value="after_address">Entre l'adresse et les réseaux sociaux</option>
+                <option value="before_banner">Entre les réseaux sociaux et la bannière</option>
+                <option value="after_banner">Après la bannière</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1.5">La photo de l'employé (avatar) reste à gauche ; ce réglage déplace le logo de l'entreprise.</p>
+            </div>
+            <div className="mt-4">
+              <Label className="text-slate-300">Mise en page de la signature (par défaut)</Label>
+              <select
+                data-testid="select-signature-layout"
+                value={s.signature_layout || "classic"}
+                onChange={set("signature_layout")}
+                className="mt-1.5 w-full h-10 rounded-md bg-slate-800/60 border border-slate-700 text-white px-3 text-sm"
+              >
+                <option value="classic">Classique — logo à gauche, filet coloré</option>
+                <option value="modern">Moderne — bloc à bordure, coordonnées en ligne</option>
+              </select>
+              <p className="text-xs text-slate-500 mt-1.5">Chaque département peut avoir sa propre mise en page dans « Bannières &amp; GIF ».</p>
+
+              {/* Aperçu comparatif Classique vs Moderne */}
+              <div className="grid sm:grid-cols-2 gap-3 mt-4" data-testid="layout-compare">
+                {[{ id: "classic", label: "Classique" }, { id: "modern", label: "Moderne" }].map((opt) => {
+                  const active = (s.signature_layout || "classic") === opt.id;
+                  const previewHtml = buildSignatureHtml(SAMPLE_EMPLOYEE, { ...s, signature_layout: opt.id, department_banners: [] }, { preview: true });
+                  return (
+                    <div key={opt.id} className={`rounded-xl border overflow-hidden ${active ? "border-blue-500 ring-1 ring-blue-500/40" : "border-slate-700"}`} data-testid={`layout-card-${opt.id}`}>
+                      <div className={`flex items-center justify-between px-3 py-2 text-xs font-semibold ${active ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-300"}`}>
+                        <span>{opt.label}</span>
+                        {active ? <span className="text-[10px]">Sélectionné</span> : (
+                          <button onClick={() => setS((p) => ({ ...p, signature_layout: opt.id }))} data-testid={`choose-layout-${opt.id}`} className="text-[10px] underline hover:no-underline">Choisir</button>
+                        )}
+                      </div>
+                      <div className="bg-white p-2 overflow-hidden" style={{ height: 150 }}>
+                        <div style={{ zoom: 0.42 }} dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="mt-4">
+              <Label className="text-slate-300">Adresse de l'entreprise</Label>
+              <Input data-testid="input-company-address" value={s.address} onChange={set("address")} placeholder="123 rue Principale, Montréal, QC H2X 1Y6" className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+            </div>
+          </div>
+
+          {/* Typography */}
+          <div className="rounded-2xl bg-[#111827] border border-slate-800 p-6" data-testid="typography-card">
+            <h3 className="font-semibold text-white mb-1">Typographie</h3>
+            <p className="text-xs text-slate-500 mb-5">Police, taille, style et couleur pour chaque partie de la signature (appliqué à tous). Tél, Direct, Courriel et Site web héritent de « Coordonnées » sauf si vous les personnalisez.</p>
+            <div className="space-y-4">
+              {TYPO_GROUPS.map(({ key, label }) => {
+                const d = TYPO_UI_DEFAULTS[key];
+                const bold = tv(key, "bold");
+                const italic = tv(key, "italic");
+                const underline = tv(key, "underline");
+                const btn = (active) => `h-9 w-9 rounded-md border text-sm font-bold ${active ? "bg-blue-600 border-blue-500 text-white" : "bg-slate-800/60 border-slate-700 text-slate-300"}`;
+                return (
+                  <div key={key} className="rounded-xl border border-slate-700/70 bg-slate-800/30 p-3" data-testid={`typo-group-${key}`}>
+                    <Label className="text-slate-200 text-sm font-semibold">{label}</Label>
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <select
+                        data-testid={`typo-${key}-font`}
+                        value={tv(key, "font") || d.font}
+                        onChange={(e) => setTypo(key, "font", e.target.value)}
+                        className="h-9 rounded-md bg-slate-800/60 border border-slate-700 text-white px-2 text-sm min-w-[130px]"
+                      >
+                        {FONT_OPTIONS.map((f) => <option key={f} value={f}>{f}</option>)}
+                      </select>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          data-testid={`typo-${key}-size`}
+                          type="number" min={8} max={40}
+                          value={tv(key, "size") ?? d.size}
+                          onChange={(e) => setTypo(key, "size", Number(e.target.value))}
+                          className="h-9 w-16 bg-slate-800/60 border-slate-700 text-white"
+                        />
+                        <span className="text-xs text-slate-500">px</span>
+                      </div>
+                      <button type="button" data-testid={`typo-${key}-bold`} onClick={() => setTypo(key, "bold", !bold)} className={btn(bold)}>B</button>
+                      <button type="button" data-testid={`typo-${key}-italic`} onClick={() => setTypo(key, "italic", !italic)} className={`${btn(italic)} italic`}>I</button>
+                      <button type="button" data-testid={`typo-${key}-underline`} onClick={() => setTypo(key, "underline", !underline)} className={`${btn(underline)} underline`}>U</button>
+                      <input
+                        type="color"
+                        data-testid={`typo-${key}-color`}
+                        value={tv(key, "color") || d.color}
+                        onChange={(e) => setTypo(key, "color", e.target.value)}
+                        className="h-9 w-12 rounded-md bg-slate-800/60 border border-slate-700 cursor-pointer"
+                        title="Couleur du texte"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Social */}
+          <div className="rounded-2xl bg-[#111827] border border-slate-800 p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-semibold text-white">Réseaux sociaux</h3>
+              <div className="flex items-center gap-1 bg-slate-800/60 border border-slate-700 rounded-lg p-0.5" data-testid="social-style-toggle">
+                <button
+                  onClick={() => setS((p) => ({ ...p, social_style: "icons" }))}
+                  data-testid="social-style-icons"
+                  className={`text-xs px-3 py-1.5 rounded-md transition-colors ${(s.social_style || "icons") === "icons" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"}`}
+                >
+                  Logos
+                </button>
+                <button
+                  onClick={() => setS((p) => ({ ...p, social_style: "names" }))}
+                  data-testid="social-style-names"
+                  className={`text-xs px-3 py-1.5 rounded-md transition-colors ${(s.social_style || "icons") === "names" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"}`}
+                >
+                  Noms
+                </button>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {socials.map(({ key, icon: Icon, ph }) => (
+                <div key={key} className="flex items-center gap-3">
+                  <Icon className="h-5 w-5 text-slate-400 shrink-0" />
+                  <Input data-testid={`input-social-${key}`} value={s.social?.[key] || ""} onChange={setSocial(key)} placeholder={ph} className="bg-slate-800/60 border-slate-700 text-white" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Promo banner link + disclaimer */}
+          <div className="rounded-2xl bg-[#111827] border border-slate-800 p-6">
+            <h3 className="font-semibold text-white mb-5">Bannière & mention légale</h3>
+            <div>
+              <Label className="text-slate-300">Lien de la bannière cliquable</Label>
+              <Input data-testid="input-promo-banner-url" value={s.banner_link} onChange={set("banner_link")} placeholder="https://entreprise.com/promo" className="mt-1.5 bg-slate-800/60 border-slate-700 text-white" />
+              <p className="text-xs text-slate-500 mt-1.5">La bannière animée (GIF) se configure dans « Composeur GIF ».</p>
+            </div>
+            <div className="mt-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-slate-300">Mention de confidentialité</Label>
+                <button onClick={() => { setS((p) => ({ ...p, disclaimer: DEFAULT_DISCLAIMER })); setRteRev((r) => r + 1); }} className="text-xs text-blue-400 hover:text-blue-300">Insérer le modèle</button>
+              </div>
+              <RichTextEditor
+                value={s.disclaimer}
+                revision={rteRev}
+                onChange={(html) => setS((p) => ({ ...p, disclaimer: html }))}
+                testId="input-disclaimer-text"
+              />
+              <p className="text-xs text-slate-500 mt-1.5">Utilisez <b>gras</b>, <i>italique</i>, souligné et sauts de ligne pour la mise en forme.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Preview */}
+        <div className="lg:sticky lg:top-8 self-start">
+          <SignaturePreview user={SAMPLE_EMPLOYEE} settings={s} />
+        </div>
+      </div>
+    </div>
+  );
+}
